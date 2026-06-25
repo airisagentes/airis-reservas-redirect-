@@ -9,6 +9,26 @@
       "source": "/pura-vida-exterior",
       "destination": "https://api.airisworld.com/widget/booking/0N0Aab67Xx8BFEoyLTs9",
       "permanent": false
+    },
+    {
+      "source": "/flores",
+      "destination": "https://api.airisworld.com/widget/booking/9EhLZ4AEhX8pRhYndBiL",
+      "permanent": false
+    },
+    {
+      "source": "/fuego",
+      "destination": "https://api.airisworld.com/widget/booking/Q1x7fNFSYK91V9kowvMR",
+      "permanent": false
+    },
+    {
+      "source": "/patio",
+      "destination": "https://api.airisworld.com/widget/booking/uEP8coQ7IbtKmyhmkCVb",
+      "permanent": false
+    },
+    {
+      "source": "/terraza",
+      "destination": "https://api.airisworld.com/widget/booking/mlamezaGApKAisNbORvI",
+      "permanent": false
     }
   ]
 }
