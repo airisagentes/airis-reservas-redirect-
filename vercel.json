@@ -1,12 +1,12 @@
 {
   "redirects": [
     {
-      "source": "/pura-vida",
+      "source": "/pura-vida/interior",
       "destination": "https://api.airisworld.com/widget/booking/qybRJ20ees4RDcdSOJuZ",
       "permanent": false
     },
     {
-      "source": "/pura-vida-exterior",
+      "source": "/pura-vida/exterior",
       "destination": "https://api.airisworld.com/widget/booking/0N0Aab67Xx8BFEoyLTs9",
       "permanent": false
     },
@@ -30,5 +30,5 @@
       "destination": "https://api.airisworld.com/widget/booking/mlamezaGApKAisNbORvI",
       "permanent": false
     }
-  ] 
+  ]
 }
