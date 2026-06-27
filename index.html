@@ -927,7 +927,7 @@ function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 function openDateModal(){ document.getElementById('date-input').value=currentDate.toISOString().split('T')[0]; document.getElementById('date-modal-overlay').classList.add('show'); }
 function applyDate(){ const val=document.getElementById('date-input').value; if(!val) return; currentDate=new Date(val+'T12:00:00'); setDateDisplay(); closeModal('date-modal-overlay'); loadPendingReservations(); toast('\ud83d\udcc5 Mostrando '+formatDate(currentDate)); }
 function setDateDisplay(){ const today=new Date(); const isToday=currentDate.toDateString()===today.toDateString(); const el=document.getElementById('date-display'); if(el) el.textContent=isToday?'Hoy':formatDate(currentDate); updateCalendarDay(); }
-function startClock(){ function tick(){ document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); } tick(); setInterval(tick,10000); }
+function startClock(){ function tick(){ document.getElementById('clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); } tick(); setInterval(tick,10000); }
 let toastTimer;
 function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2500); }
 function formatTime(iso){ if(!iso) return '\u2014'; return new Date(iso).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); }

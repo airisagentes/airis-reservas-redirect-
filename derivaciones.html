@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0D0C1A">
+  <title>Airis — Derivaciones</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --accent: #6C63FF; --accent-dim: rgba(108,99,255,0.15); --accent-border: rgba(108,99,255,0.35);
+      --bg: #0D0C1A; --bg2: #131222; --bg3: #201F30; --card: #1D1C2E;
+      --border: rgba(255,255,255,0.07); --text: #F2EFFF; --text2: #9490B5; --text3: #56527A;
+      --free: #4ade80; --free-bg: rgba(34,197,94,0.10);
+      --occupied: #F4857A; --occupied-bg: rgba(244,133,122,0.12);
+      --radius: 12px; --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Bricolage Grotesque', -apple-system, sans-serif; overflow: hidden; }
+
+    /* TOPBAR */
+    #topbar { height: 52px; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; flex-shrink: 0; position: relative; }
+    .topbar-left { display: flex; align-items: center; }
+    .airis-chip { background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 8px; }
+    .topbar-center { position: absolute; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .live-badge { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--free); }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--free); animation: pulse 2s infinite; }
+    .time-display { font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* LAYOUT */
+    #app { display: flex; flex-direction: column; height: 100vh; }
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    /* LISTA IZQUIERDA */
+    #lista-derivados { width: 300px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+    @media (max-width: 600px) {
+      .topbar-center { font-size: 13px; letter-spacing: 0.06em; }
+      .live-badge span { display: none; }
+    }
+    #lista-header { padding: 14px; border-bottom: 1px solid var(--border); }
+    .lista-label { font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+    #lista-count { font-size: 11px; color: var(--text2); }
+    #lista-items { flex: 1; overflow-y: auto; padding: 8px; }
+    #lista-items::-webkit-scrollbar { width: 4px; }
+    #lista-items::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .contacto-item { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 6px; cursor: pointer; transition: border-color 0.2s; }
+    .contacto-item:hover { border-color: rgba(108,99,255,0.3); }
+    .contacto-item.active { border-color: var(--accent); background: var(--accent-dim); }
+    .contacto-nombre { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contacto-preview { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contacto-tiempo { font-size: 10px; color: var(--text3); margin-top: 4px; }
+    .derivado-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--occupied-bg); color: var(--occupied); font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 10px; margin-bottom: 5px; border: 1px solid rgba(244,133,122,0.25); }
+    .empty-lista { text-align: center; padding: 32px 16px; font-size: 12px; color: var(--text3); }
+    .empty-lista i { font-size: 28px; opacity: 0.3; display: block; margin-bottom: 8px; }
+    #btn-refresh { margin: 8px; padding: 8px; border-radius: var(--radius-sm); background: var(--bg3); border: 1px solid var(--border); color: var(--text2); font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s; }
+    #btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* CHAT AREA */
+    #chat-area { flex: 1; display: flex; flex-direction: column; }
+    #chat-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text3); }
+    #chat-empty i { font-size: 40px; opacity: 0.2; }
+    #chat-empty p { font-size: 13px; }
+    #chat-panel { display: none; flex-direction: column; height: 100%; }
+    #chat-panel.visible { display: flex; }
+
+    /* CHAT HEADER */
+    #chat-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    #chat-contact-info { display: flex; flex-direction: column; }
+    #chat-contact-name { font-size: 15px; font-weight: 600; color: var(--text); }
+    #chat-contact-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+    #btn-resolver { background: var(--free-bg); border: 1px solid rgba(74,222,128,0.3); color: var(--free); font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+    #btn-resolver:hover { background: rgba(74,222,128,0.2); }
+    #btn-resolver:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* MENSAJES */
+    #mensajes-container { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    #mensajes-container::-webkit-scrollbar { width: 4px; }
+    #mensajes-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .msg-wrapper { display: flex; flex-direction: column; }
+    .msg-wrapper.outbound { align-items: flex-end; }
+    .msg-wrapper.inbound { align-items: flex-start; }
+    .msg-label { font-size: 9px; color: var(--text3); margin-bottom: 3px; }
+    .msg-bubble { max-width: 70%; padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+    .msg-wrapper.inbound .msg-bubble { background: var(--bg3); color: var(--text); border-radius: 2px 10px 10px 10px; }
+    .msg-wrapper.outbound .msg-bubble { background: var(--accent-dim); color: var(--text); border-radius: 10px 2px 10px 10px; border: 1px solid var(--accent-border); }
+    .msg-wrapper.operator .msg-bubble { background: var(--accent); color: #fff; border-radius: 10px 2px 10px 10px; }
+    .msg-wrapper.operator { align-items: flex-end; }
+    .msg-time { font-size: 9px; color: var(--text3); margin-top: 3px; }
+    .msg-audio { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); }
+    .msg-audio i { font-size: 16px; }
+    .derivacion-chip { align-self: center; background: var(--occupied-bg); border: 1px solid rgba(244,133,122,0.25); border-radius: 20px; padding: 4px 12px; font-size: 10px; color: var(--occupied); display: flex; align-items: center; gap: 5px; margin: 4px 0; }
+    .loading-msgs { text-align: center; padding: 24px; font-size: 12px; color: var(--text3); }
+
+    /* INPUT AREA */
+    #input-area { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+    #msg-input { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; color: var(--text); font-size: 13px; font-family: inherit; resize: none; min-height: 40px; max-height: 120px; overflow-y: auto; }
+    #msg-input:focus { outline: none; border-color: var(--accent); }
+    #msg-input::placeholder { color: var(--text3); }
+    #btn-send { background: var(--accent); border: none; color: #fff; padding: 10px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: all 0.15s; flex-shrink: 0; }
+    #btn-send:hover { background: #5a52e0; }
+    #btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* TOAST */
+    #toast { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 18px; font-size: 13px; color: var(--text); z-index: 200; opacity: 0; transition: all 0.3s; white-space: nowrap; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* LOADING */
+    #loading { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 90; }
+    .loading-logo { font-size: 32px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
+    .loading-bar { width: 120px; height: 2px; background: var(--bg3); border-radius: 1px; overflow: hidden; }
+    .loading-progress { height: 100%; background: var(--accent); border-radius: 1px; animation: load 1.5s ease-in-out infinite; }
+    @keyframes load { 0%{width:0%;margin-left:0} 50%{width:80%;margin-left:10%} 100%{width:0%;margin-left:100%} }
+
+    /* PIN */
+    #pin-screen { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 32px; display: none; }
+    .pin-logo { font-size: 28px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
+    .pin-sub { font-size: 13px; color: var(--text2); margin-top: -24px; }
+    .pin-dots { display: flex; gap: 14px; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bg3); border: 1.5px solid var(--border); transition: all 0.2s; }
+    .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+    .pin-pad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
+    .pin-btn { width: 72px; height: 72px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-size: 22px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+    .pin-btn:active { background: var(--accent-dim); border-color: var(--accent); transform: scale(0.95); }
+    .pin-btn.del { font-size: 16px; color: var(--text2); }
+    .pin-error { color: var(--occupied); font-size: 13px; opacity: 0; transition: opacity 0.3s; }
+    .pin-error.show { opacity: 1; }
+
+    /* MODAL CONFIRM */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; justify-content: center; z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+    .modal { background: var(--bg2); border-radius: 16px 16px 0 0; border-top: 1px solid var(--border); padding: 20px 20px 36px; width: 100%; max-width: 480px; transform: translateY(100%); transition: transform 0.3s ease; }
+    .modal-overlay.show .modal { transform: translateY(0); }
+    .modal-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+    .modal-body { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-btn { flex: 1; padding: 11px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); }
+    .modal-btn.confirm { background: var(--free); border-color: var(--free); color: #0D0C1A; }
+    .modal-btn.cancel { background: var(--bg3); color: var(--text2); }
+
+    @media (max-width: 600px) {
+      #lista-derivados { width: 100%; display: flex; position: fixed; inset: 52px 0 0 0; z-index: 30; background: var(--bg2); }
+      #lista-derivados.hidden-mobile { display: none; }
+      #chat-area { width: 100%; }
+      #btn-volver { display: flex !important; }
+      .live-badge span { display: none; }
+      .topbar-center { font-size: 13px; }
+      #toast { bottom: 80px; }
+    }
+    @media (min-width: 601px) {
+      #btn-volver { display: none !important; }
+    }
+    #btn-volver { display: none; background: none; border: none; color: var(--text2); font-size: 20px; cursor: pointer; padding: 4px 8px 4px 0; }
+    .msg-audio-player { display: flex; flex-direction: column; gap: 6px; }
+    .msg-audio-player audio { width: 100%; height: 32px; outline: none; }
+    .msg-audio-label { font-size: 10px; color: var(--text3); display: flex; align-items: center; gap: 4px; }
+  </style>
+</head>
+<body>
+
+<div id="loading"><div class="loading-logo">AIRIS</div><div class="loading-bar"><div class="loading-progress"></div></div></div>
+
+<div id="pin-screen">
+  <div class="pin-logo">AIRIS</div>
+  <div class="pin-sub">Ingresá tu PIN para continuar</div>
+  <div class="pin-dots"><div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div><div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div></div>
+  <div class="pin-pad">
+    <button class="pin-btn" onclick="pinPress('1')">1</button><button class="pin-btn" onclick="pinPress('2')">2</button><button class="pin-btn" onclick="pinPress('3')">3</button>
+    <button class="pin-btn" onclick="pinPress('4')">4</button><button class="pin-btn" onclick="pinPress('5')">5</button><button class="pin-btn" onclick="pinPress('6')">6</button>
+    <button class="pin-btn" onclick="pinPress('7')">7</button><button class="pin-btn" onclick="pinPress('8')">8</button><button class="pin-btn" onclick="pinPress('9')">9</button>
+    <button class="pin-btn" style="visibility:hidden"></button><button class="pin-btn" onclick="pinPress('0')">0</button><button class="pin-btn del" onclick="pinDel()">&#9003;</button>
+  </div>
+  <div class="pin-error" id="pin-error">PIN incorrecto. Intentá de nuevo.</div>
+</div>
+
+<div id="app" style="display:none">
+  <div id="topbar">
+    <div class="topbar-left">
+      <div class="airis-chip">airis.</div>
+    </div>
+    <div class="topbar-center" id="restaurant-name-display">Cargando...</div>
+    <div class="topbar-right">
+      <div class="live-badge"><div class="live-dot"></div><span>En vivo</span></div>
+      <div class="time-display" id="clock-display">--:--</div>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- LISTA IZQUIERDA -->
+    <div id="lista-derivados">
+      <div id="lista-header">
+        <div class="lista-label">Derivaciones activas</div>
+        <div id="lista-count">Cargando...</div>
+      </div>
+      <div id="lista-items">
+        <div class="empty-lista"><i class="ti ti-inbox"></i>Cargando derivaciones...</div>
+      </div>
+      <button id="btn-refresh" onclick="cargarDerivados()">
+        <i class="ti ti-refresh" style="font-size:14px"></i> Actualizar
+      </button>
+    </div>
+
+    <!-- CHAT AREA -->
+    <div id="chat-area">
+      <div id="chat-empty">
+        <i class="ti ti-message-2"></i>
+        <p>Seleccioná una derivación para ver el chat</p>
+      </div>
+
+      <div id="chat-panel">
+        <div id="chat-header">
+          <div style="display:flex;align-items:center;gap:8px">
+            <button id="btn-volver" onclick="volverALista()"><i class="ti ti-arrow-left"></i></button>
+            <div id="chat-contact-info">
+              <div id="chat-contact-name">—</div>
+              <div id="chat-contact-sub">—</div>
+            </div>
+          </div>
+          <button id="btn-resolver" onclick="confirmarResolver()">
+            <i class="ti ti-check" style="font-size:14px"></i> Resuelto
+          </button>
+        </div>
+
+        <div id="mensajes-container">
+          <div class="loading-msgs">Cargando mensajes...</div>
+        </div>
+
+        <div id="input-area">
+          <textarea id="msg-input" placeholder="Escribí tu respuesta..." rows="1" oninput="autoResize(this)" onkeydown="handleEnter(event)"></textarea>
+          <button id="btn-send" onclick="enviarMensaje()">
+            <i class="ti ti-send" style="font-size:14px"></i> Enviar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- MODAL RESOLVER -->
+<div class="modal-overlay" id="modal-resolver">
+  <div class="modal">
+    <div class="modal-title">✅ Marcar como resuelto</div>
+    <div class="modal-body" id="modal-resolver-body">¿Confirmás que la consulta fue resuelta? El bot se reactivará automáticamente.</div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeModal('modal-resolver')">Cancelar</button>
+      <button class="modal-btn confirm" onclick="ejecutarResolver()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://wjfmzzkvmeznfvoczwda.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZm16emt2bWV6bmZ2b2N6d2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjgwNTMsImV4cCI6MjA5NjgwNDA1M30.V34mXq1OiL3o_9FsVFGpAYUCCoeKifgqUy0_TwqehsI';
+const RESTAURANT_SLUG = 'pura-vida';
+const GHL_TOKEN = 'pit-6980ba1a-cfb1-4bd4-8b4e-e5230bec1c14';
+const PIN_STORAGE_KEY = 'airis_pin_auth';
+const PIN_EXPIRY_DAYS = 30;
+const N8N_BASE = 'https://n8n-n8n.hovq6t.easypanel.host/webhook';
+
+let sb, restaurant, pinBuffer = '';
+let contactoActivo = null;
+let autoRefreshInterval = null;
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+async function init() {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  const { data: r } = await sb.from('restaurants').select('*').eq('slug', RESTAURANT_SLUG).single();
+  restaurant = r;
+  checkAuth();
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────
+function checkAuth() {
+  const stored = localStorage.getItem(PIN_STORAGE_KEY);
+  if (stored) { const { expiry } = JSON.parse(stored); if (Date.now() < expiry) { showApp(); return; } }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('pin-screen').style.display = 'flex';
+}
+function pinPress(digit) { if (pinBuffer.length >= 4) return; pinBuffer += digit; updatePinDots(); if (pinBuffer.length === 4) setTimeout(checkPin, 150); }
+function pinDel() { pinBuffer = pinBuffer.slice(0,-1); updatePinDots(); }
+function updatePinDots() { for (let i=0;i<4;i++) document.getElementById(`d${i}`).classList.toggle('filled', i < pinBuffer.length); }
+function checkPin() {
+  if (pinBuffer === restaurant.pin) {
+    localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify({ expiry: Date.now() + PIN_EXPIRY_DAYS*86400000 }));
+    document.getElementById('pin-screen').style.display = 'none'; showApp();
+  } else {
+    document.getElementById('pin-error').classList.add('show'); pinBuffer = ''; updatePinDots();
+    setTimeout(() => document.getElementById('pin-error').classList.remove('show'), 2000);
+  }
+}
+function showApp() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('restaurant-name-display').textContent = restaurant.name;
+  cargarDerivados();
+  autoRefreshInterval = setInterval(cargarDerivados, 30000);
+  // Reloj
+  function updateClock() { const now = new Date(); document.getElementById('clock-display').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  updateClock(); setInterval(updateClock, 1000);
+}
+
+// ── CARGAR DERIVADOS ──────────────────────────────────────────────────────
+async function cargarDerivados() {
+  try {
+    const res = await fetch('https://services.leadconnectorhq.com/contacts/search', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${GHL_TOKEN}`, 'Version': '2021-07-28', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: restaurant.ghl_location_id, filters: [{ field: 'tags', operator: 'contains', value: 'derivacion-a-humano' }], pageLimit: 20 })
+    });
+    const data = await res.json();
+    const contactos = data.contacts || [];
+    renderLista(contactos);
+  } catch(e) { console.error('Error cargando derivados:', e); toast('Error al cargar derivaciones'); }
+}
+
+function renderLista(contactos) {
+  const lista = document.getElementById('lista-items');
+  const count = document.getElementById('lista-count');
+  count.textContent = contactos.length === 0 ? 'Sin derivaciones activas' : `${contactos.length} esperando respuesta`;
+  if (!contactos.length) {
+    // Si hay contacto activo, no borrar la lista — solo actualizar el contador
+    if (contactoActivo) {
+      count.textContent = '1 esperando respuesta';
+      return;
+    }
+    lista.innerHTML = `<div class="empty-lista"><i class="ti ti-inbox"></i>Sin derivaciones activas</div>`;
+    return;
+  }
+  // Si el contacto activo ya no está en la lista (fue resuelto por otro operador), mantenerlo igual
+  const activoSigueEnLista = contactos.some(c => c.id === contactoActivo?.id);
+  if (contactoActivo && !activoSigueEnLista) {
+    // El contacto fue resuelto externamente — lo dejamos hasta que el operador actual resuelva
+    contactos = [contactoActivo, ...contactos];
+  }
+  lista.innerHTML = contactos.map(c => `
+    <div class="contacto-item${contactoActivo?.id === c.id ? ' active' : ''}" onclick="seleccionarContacto(${JSON.stringify(c).replace(/"/g, '&quot;')})">
+      <div class="derivado-badge"><i class="ti ti-alert-circle" style="font-size:10px"></i> Derivado</div>
+      <div class="contacto-nombre">${c.contactName || c.firstName || 'Sin nombre'}</div>
+      <div class="contacto-preview">${c.phone || '—'}</div>
+      <div class="contacto-tiempo">${c.tags?.join(', ') || ''}</div>
+    </div>
+  `).join('');
+}
+
+// ── SELECCIONAR CONTACTO ──────────────────────────────────────────────────
+async function seleccionarContacto(contacto) {
+  contactoActivo = contacto;
+  document.getElementById('chat-empty').style.display = 'none';
+  document.getElementById('chat-panel').classList.add('visible');
+  document.getElementById('chat-contact-name').textContent = contacto.contactName || contacto.firstName || 'Sin nombre';
+  document.getElementById('chat-contact-sub').textContent = contacto.phone || '—';
+  document.querySelectorAll('.contacto-item').forEach(el => el.classList.remove('active'));
+  event?.currentTarget?.classList?.add('active');
+  // Mobile: ocultar lista y mostrar chat
+  if (window.innerWidth <= 600) {
+    document.getElementById('lista-derivados').classList.add('hidden-mobile');
+  }
+  await cargarMensajes(contacto);
+}
+
+function volverALista() {
+  document.getElementById('lista-derivados').classList.remove('hidden-mobile');
+  document.getElementById('chat-panel').classList.remove('visible');
+  document.getElementById('chat-empty').style.display = 'flex';
+  contactoActivo = null;
+}
+
+async function cargarMensajes(contacto) {
+  const container = document.getElementById('mensajes-container');
+  container.innerHTML = '<div class="loading-msgs">Cargando mensajes...</div>';
+  try {
+    const res = await fetch(`${N8N_BASE}/obtener-conversacion?locationId=${restaurant.ghl_location_id}&contactId=${contacto.id}`);
+    const data = await res.json();
+    const msgs = data[0]?.messages?.messages || [];
+    renderMensajes(msgs.reverse(), contacto);
+  } catch(e) { container.innerHTML = '<div class="loading-msgs">Error al cargar mensajes.</div>'; }
+}
+
+function renderMensajes(msgs, contacto) {
+  const container = document.getElementById('mensajes-container');
+  if (!msgs.length) { container.innerHTML = '<div class="loading-msgs">Sin mensajes en esta conversación.</div>'; return; }
+  container.innerHTML = '';
+  msgs.forEach(msg => {
+    const dir = msg.direction;
+    const hasAudio = msg.attachments?.length > 0 && msg.attachments[0]?.endsWith?.('.ogg') || msg.attachments?.[0]?.includes?.('.ogg') || (msg.attachments?.length > 0 && !msg.body);
+    const isOperator = dir === 'outbound' && msg.source !== 'app';
+    const wrapper = document.createElement('div');
+    wrapper.className = `msg-wrapper ${dir === 'inbound' ? 'inbound' : (isOperator ? 'operator' : 'outbound')}`;
+    const label = dir === 'inbound' ? 'Cliente' : (isOperator ? 'Vos (operador)' : 'Agente Airis');
+    const time = new Date(msg.dateAdded).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    let content = '';
+    if (hasAudio && msg.attachments?.[0]) {
+      content = `<div class="msg-bubble"><div class="msg-audio-player"><div class="msg-audio-label"><i class="ti ti-microphone" style="font-size:13px"></i> Audio de ${dir === 'inbound' ? 'cliente' : 'agente'}</div><audio controls src="${msg.attachments[0]}" preload="none" style="width:100%;height:32px"></audio></div></div>`;
+    } else if (msg.body) {
+      content = `<div class="msg-bubble">${msg.body}</div>`;
+    }
+    if (!content) return;
+    wrapper.innerHTML = `<div class="msg-label">${label}</div>${content}<div class="msg-time">${time}</div>`;
+    container.appendChild(wrapper);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+// ── ENVIAR MENSAJE ─────────────────────────────────────────────────────────
+async function enviarMensaje() {
+  if (!contactoActivo) return;
+  const input = document.getElementById('msg-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  const btn = document.getElementById('btn-send');
+  btn.disabled = true;
+  input.value = '';
+  autoResize(input);
+  try {
+    await fetch(`${N8N_BASE}/enviar-mensaje`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: restaurant.ghl_location_id, contactId: contactoActivo.id, message: msg })
+    });
+    toast('✅ Mensaje enviado');
+    setTimeout(() => cargarMensajes(contactoActivo), 1500);
+  } catch(e) { toast('Error al enviar el mensaje'); }
+  btn.disabled = false;
+}
+
+// ── RESOLVER ──────────────────────────────────────────────────────────────
+function confirmarResolver() {
+  if (!contactoActivo) return;
+  const nombre = contactoActivo.contactName || contactoActivo.firstName || 'este contacto';
+  document.getElementById('modal-resolver-body').textContent = `¿Confirmás que la consulta de ${nombre} fue resuelta? El bot se reactivará automáticamente.`;
+  document.getElementById('modal-resolver').classList.add('show');
+}
+
+async function ejecutarResolver() {
+  closeModal('modal-resolver');
+  if (!contactoActivo) return;
+  const btn = document.getElementById('btn-resolver');
+  btn.disabled = true;
+  try {
+    await fetch(`${N8N_BASE}/resolver-derivacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contactId: contactoActivo.id, locationId: restaurant.ghl_location_id })
+    });
+    toast('✅ Derivación resuelta — bot reactivado');
+    contactoActivo = null;
+    document.getElementById('chat-panel').classList.remove('visible');
+    document.getElementById('chat-empty').style.display = 'flex';
+    document.getElementById('lista-derivados').classList.remove('hidden-mobile');
+    setTimeout(cargarDerivados, 1000);
+  } catch(e) { toast('Error al resolver'); }
+  btn.disabled = false;
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────
+function handleEnter(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(); } }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-overlay').forEach(o => { o.addEventListener('click', e => { if (e.target === o) o.classList.remove('show'); }); });
+
+let toastTimer;
+function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2500); }
+
+init();
+</script>
+</body>
+</html>

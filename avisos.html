@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0D0C1A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Airis — Avisos</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --accent: #6C63FF; --accent-dim: rgba(108,99,255,0.15); --accent-border: rgba(108,99,255,0.35);
+      --bg: #0D0C1A; --bg2: #131222; --bg3: #201F30; --card: #1D1C2E;
+      --border: rgba(255,255,255,0.07); --text: #F2EFFF; --text2: #9490B5; --text3: #56527A;
+      --free: #4ade80;
+      --promo: #FAC775; --promo-bg: rgba(250,199,117,0.10);
+      --apertura: #1D9E75; --apertura-bg: rgba(29,158,117,0.12);
+      --cierre: #D85A30; --cierre-bg: rgba(216,90,48,0.12);
+      --aviso: #378ADD; --aviso-bg: rgba(55,138,221,0.10);
+      --radius: 12px; --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: 'Bricolage Grotesque', -apple-system, sans-serif; }
+
+    #loading { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 90; }
+    .loading-logo { font-size: 32px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
+    .loading-bar { width: 120px; height: 2px; background: var(--bg3); border-radius: 1px; overflow: hidden; }
+    .loading-progress { height: 100%; background: var(--accent); border-radius: 1px; animation: load 1.5s ease-in-out infinite; }
+    @keyframes load { 0%{width:0%;margin-left:0} 50%{width:80%;margin-left:10%} 100%{width:0%;margin-left:100%} }
+
+    #pin-screen { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 32px; }
+    .pin-logo { font-size: 28px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
+    .pin-sub { font-size: 13px; color: var(--text2); margin-top: -24px; }
+    .pin-dots { display: flex; gap: 14px; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bg3); border: 1.5px solid var(--border); transition: all 0.2s; }
+    .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+    .pin-pad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
+    .pin-btn { width: 72px; height: 72px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-size: 22px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+    .pin-btn:active { background: var(--accent-dim); border-color: var(--accent); transform: scale(0.95); }
+    .pin-btn.del { font-size: 16px; color: var(--text2); }
+    .pin-error { color: var(--cierre); font-size: 13px; opacity: 0; transition: opacity 0.3s; }
+    .pin-error.show { opacity: 1; }
+
+    /* TOPBAR — idéntico al panel principal */
+    #topbar { height: 52px; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; flex-shrink: 0; position: relative; }
+    .topbar-left { display: flex; align-items: center; }
+    .airis-chip { background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 8px; }
+    .topbar-center { position: absolute; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); white-space: nowrap; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .live-badge { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--free); }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--free); animation: pulse 2s infinite; }
+    .time-display { font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    @media (max-width: 600px) { .topbar-center { font-size: 13px; } .live-badge span { display: none; } }
+
+    #app { display: none; max-width: 720px; margin: 0 auto; padding: 16px; padding-bottom: 60px; }
+
+    .section-label { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin: 20px 0 10px; }
+    .section-label:first-child { margin-top: 4px; }
+    .limit-note { font-size: 11px; color: var(--text2); background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 4px; }
+    .template-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .template-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: border-color 0.15s, transform 0.1s; }
+    .template-card:active { transform: scale(0.97); }
+    .template-card .icon { font-size: 22px; }
+    .template-card .name { font-size: 13px; font-weight: 500; color: var(--text); }
+    .template-card .desc { font-size: 11px; color: var(--text2); line-height: 1.4; }
+    .template-card.promocion .icon { color: var(--promo); }
+    .template-card.apertura_especial .icon { color: var(--apertura); }
+    .template-card.cierre_extraordinario .icon { color: var(--cierre); }
+    .template-card.aviso_operativo .icon { color: var(--aviso); }
+    .aviso-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; }
+    .aviso-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+    .aviso-cat { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text); }
+    .aviso-cat i { font-size: 15px; }
+    .aviso-cat.promocion i { color: var(--promo); }
+    .aviso-cat.apertura_especial i { color: var(--apertura); }
+    .aviso-cat.cierre_extraordinario i { color: var(--cierre); }
+    .aviso-cat.aviso_operativo i { color: var(--aviso); }
+    .aviso-text { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 6px; }
+    .aviso-dates { font-size: 10px; color: var(--text3); }
+    .aviso-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .toggle { width: 32px; height: 18px; border-radius: 999px; position: relative; cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid var(--border); transition: all 0.15s; flex-shrink: 0; }
+    .toggle.on { background: var(--accent-dim); border-color: var(--accent); }
+    .toggle::after { content: ""; position: absolute; top: 1.5px; left: 1.5px; width: 13px; height: 13px; border-radius: 50%; background: var(--text3); transition: all 0.15s; }
+    .toggle.on::after { background: var(--accent); transform: translateX(14px); }
+    .delete-btn { width: 26px; height: 26px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .delete-btn:active { background: var(--cierre-bg); color: var(--cierre); }
+    .empty-state { text-align: center; padding: 24px 0; }
+    .empty-state-icon { font-size: 28px; opacity: 0.2; margin-bottom: 8px; color: var(--accent); }
+    .empty-state-text { font-size: 12px; color: var(--text3); }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; justify-content: center; z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+    .modal { background: var(--bg2); border-radius: 16px 16px 0 0; border-top: 1px solid var(--border); padding: 20px 20px 36px; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; transform: translateY(100%); transition: transform 0.3s ease; }
+    .modal-overlay.show .modal { transform: translateY(0); }
+    .modal-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .field-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; display: block; }
+    .modal-input, .modal-select, .modal-textarea { width: 100%; padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; margin-bottom: 14px; font-family: inherit; }
+    .modal-textarea { resize: vertical; min-height: 70px; }
+    .modal-input:focus, .modal-select:focus, .modal-textarea:focus { outline: none; border-color: var(--accent); }
+    .modal-input::placeholder, .modal-textarea::placeholder { color: var(--text3); }
+    .date-row { display: flex; gap: 10px; }
+    .date-row > div { flex: 1; }
+    .preview-box { background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 14px; font-size: 12px; color: var(--text); line-height: 1.5; }
+    .preview-label { font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .modal-btns { display: flex; gap: 8px; margin-top: 4px; }
+    .modal-btn { flex: 1; padding: 11px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); }
+    .modal-btn.confirm { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .modal-btn.cancel { background: var(--bg3); color: var(--text2); }
+    #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 18px; font-size: 13px; color: var(--text); z-index: 200; opacity: 0; transition: all 0.3s; white-space: nowrap; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div id="loading"><div class="loading-logo">AIRIS</div><div class="loading-bar"><div class="loading-progress"></div></div></div>
+
+<div id="pin-screen" style="display:none">
+  <div class="pin-logo">AIRIS</div>
+  <div class="pin-sub">Ingresá tu PIN para continuar</div>
+  <div class="pin-dots"><div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div><div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div></div>
+  <div class="pin-pad">
+    <button class="pin-btn" onclick="pinPress('1')">1</button><button class="pin-btn" onclick="pinPress('2')">2</button><button class="pin-btn" onclick="pinPress('3')">3</button>
+    <button class="pin-btn" onclick="pinPress('4')">4</button><button class="pin-btn" onclick="pinPress('5')">5</button><button class="pin-btn" onclick="pinPress('6')">6</button>
+    <button class="pin-btn" onclick="pinPress('7')">7</button><button class="pin-btn" onclick="pinPress('8')">8</button><button class="pin-btn" onclick="pinPress('9')">9</button>
+    <button class="pin-btn" style="visibility:hidden"></button><button class="pin-btn" onclick="pinPress('0')">0</button><button class="pin-btn del" onclick="pinDel()">⌫</button>
+  </div>
+  <div class="pin-error" id="pin-error">PIN incorrecto. Intentá de nuevo.</div>
+</div>
+
+<div id="topbar">
+  <div class="topbar-left"><div class="airis-chip">airis.</div></div>
+  <div class="topbar-center" id="restaurant-name-display">Cargando...</div>
+  <div class="topbar-right">
+    <div class="live-badge"><div class="live-dot"></div><span>En vivo</span></div>
+    <div class="time-display" id="clock-display">--:--</div>
+  </div>
+</div>
+
+<div id="app">
+  <div style="padding: 16px;">
+    <div class="section-label">Nuevo aviso</div>
+    <div class="limit-note" id="limit-note" style="display:none">Ya tenés el máximo de avisos activos (5). Desactivá uno para agregar otro.</div>
+    <div class="template-grid">
+      <div class="template-card promocion" onclick="openModal('promocion')"><i class="ti ti-discount-2 icon"></i><span class="name">Promoción</span><span class="desc">Happy hour, descuentos, 2x1</span></div>
+      <div class="template-card apertura_especial" onclick="openModal('apertura_especial')"><i class="ti ti-calendar-event icon"></i><span class="name">Apertura especial</span><span class="desc">Feriado o evento con apertura</span></div>
+      <div class="template-card cierre_extraordinario" onclick="openModal('cierre_extraordinario')"><i class="ti ti-door-exit icon"></i><span class="name">Cierre extraordinario</span><span class="desc">Día/s sin atención al público</span></div>
+      <div class="template-card aviso_operativo" onclick="openModal('aviso_operativo')"><i class="ti ti-info-circle icon"></i><span class="name">Aviso operativo</span><span class="desc">Clima, sugerencias, novedades</span></div>
+    </div>
+    <div class="section-label">Avisos</div>
+    <div id="avisos-list"><div class="empty-state"><div class="empty-state-icon"><i class="ti ti-bell"></i></div><div class="empty-state-text">Cargando avisos...</div></div></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div class="modal-overlay" id="aviso-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Nuevo aviso</div>
+    <div id="modal-body"></div>
+    <div class="preview-box" id="preview-box" style="display:none"><div class="preview-label">Así se lo va a decir el bot</div><div id="preview-text"></div></div>
+    <div class="modal-btns"><button class="modal-btn cancel" onclick="closeModal()">Cancelar</button><button class="modal-btn confirm" onclick="saveAviso()">Guardar</button></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://wjfmzzkvmeznfvoczwda.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZm16emt2bWV6bmZ2b2N6d2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjgwNTMsImV4cCI6MjA5NjgwNDA1M30.V34mXq1OiL3o_9FsVFGpAYUCCoeKifgqUy0_TwqehsI';
+const RESTAURANT_SLUG = 'pura-vida';
+const PIN_STORAGE_KEY = 'airis_pin_auth';
+const MAX_ACTIVOS = 5;
+
+let sb, restaurant, currentCategoria = null;
+
+const CATEGORIA_INFO = {
+  promocion: { label: 'Promoción', icon: 'ti-discount-2' },
+  apertura_especial: { label: 'Apertura especial', icon: 'ti-calendar-event' },
+  cierre_extraordinario: { label: 'Cierre extraordinario', icon: 'ti-door-exit' },
+  aviso_operativo: { label: 'Aviso operativo', icon: 'ti-info-circle' }
+};
+
+async function init() {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  const { data: r } = await sb.from('restaurants').select('*').eq('slug', RESTAURANT_SLUG).single();
+  restaurant = r;
+  checkAuth();
+}
+
+function checkAuth() {
+  const stored = localStorage.getItem(PIN_STORAGE_KEY);
+  if (stored) { const { expiry } = JSON.parse(stored); if (Date.now() < expiry) { showApp(); return; } }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('pin-screen').style.display = 'flex';
+}
+
+let pinBuffer = '';
+function pinPress(digit) { if (pinBuffer.length >= 4) return; pinBuffer += digit; updatePinDots(); if (pinBuffer.length === 4) setTimeout(checkPin, 150); }
+function pinDel() { pinBuffer = pinBuffer.slice(0, -1); updatePinDots(); }
+function updatePinDots() { for (let i = 0; i < 4; i++) document.getElementById(`d${i}`).classList.toggle('filled', i < pinBuffer.length); }
+function checkPin() {
+  if (pinBuffer === restaurant.pin) {
+    document.getElementById('pin-screen').style.display = 'none'; showApp();
+  } else {
+    document.getElementById('pin-error').classList.add('show'); pinBuffer = ''; updatePinDots();
+    setTimeout(() => document.getElementById('pin-error').classList.remove('show'), 2000);
+  }
+}
+
+function showApp() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('restaurant-name-display').textContent = restaurant.name;
+  function updateClock() { const now = new Date(); document.getElementById('clock-display').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  updateClock(); setInterval(updateClock, 1000);
+  loadAvisos();
+}
+
+function formatShort(dateStr) { if (!dateStr) return ''; const [y, m, d] = dateStr.split('-'); return `${d}/${m}`; }
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+function generateText(categoria, form) {
+  if (categoria === 'promocion' || categoria === 'aviso_operativo') return (form.texto || '').trim();
+  if (categoria === 'apertura_especial') {
+    if (!form.fecha) return '';
+    let motivoText = form.motivo === 'feriado' ? 'feriado' : form.motivo === 'evento' ? 'un evento especial' : (form.motivo_otro || 'un motivo especial').trim();
+    let txt = `El ${formatShort(form.fecha)} el restaurante abre`;
+    if (form.horario && form.horario.trim()) txt += ` en horario especial de ${form.horario.trim()}`;
+    return txt + ` por ${motivoText}.`;
+  }
+  if (categoria === 'cierre_extraordinario') {
+    if (!form.fecha_desde) return '';
+    const motivo = (form.motivo || '').trim();
+    let txt = (!form.fecha_hasta || form.fecha_hasta === form.fecha_desde)
+      ? `El restaurante permanecerá cerrado el ${formatShort(form.fecha_desde)}`
+      : `El restaurante permanecerá cerrado desde el ${formatShort(form.fecha_desde)} hasta el ${formatShort(form.fecha_hasta)}`;
+    return txt + (motivo ? ` por ${motivo}` : '') + '.';
+  }
+  return '';
+}
+
+function openModal(categoria) {
+  currentCategoria = categoria;
+  const info = CATEGORIA_INFO[categoria];
+  document.getElementById('modal-title').innerHTML = `<i class="ti ${info.icon}"></i> ${info.label}`;
+  const body = document.getElementById('modal-body');
+  const today = todayStr();
+  if (categoria === 'promocion' || categoria === 'aviso_operativo') {
+    const placeholder = categoria === 'promocion' ? 'Ej: 2x1 en tragos los sábados y domingos de 18 a 20hs' : 'Ej: Hoy hace frío, sugerile a los clientes reservar en el salón interior';
+    body.innerHTML = `<label class="field-label">Texto del aviso</label><textarea class="modal-textarea" id="f-texto" placeholder="${placeholder}" oninput="updatePreview()"></textarea><div class="date-row"><div><label class="field-label">Desde</label><input type="date" class="modal-input" id="f-desde" value="${today}" oninput="updatePreview()"></div><div><label class="field-label">Hasta (opcional)</label><input type="date" class="modal-input" id="f-hasta" oninput="updatePreview()"></div></div>`;
+  } else if (categoria === 'apertura_especial') {
+    body.innerHTML = `<label class="field-label">Fecha</label><input type="date" class="modal-input" id="f-fecha" value="${today}" oninput="updatePreview()"><label class="field-label">Horario especial (opcional)</label><input type="text" class="modal-input" id="f-horario" placeholder="Ej: 19 a 01hs" oninput="updatePreview()"><label class="field-label">Motivo</label><select class="modal-select" id="f-motivo" onchange="onMotivoChange();updatePreview()"><option value="feriado">Feriado</option><option value="evento">Evento especial</option><option value="otro">Otro</option></select><div id="motivo-otro-wrap" style="display:none"><label class="field-label">Especificar motivo</label><input type="text" class="modal-input" id="f-motivo-otro" placeholder="Ej: aniversario del local" oninput="updatePreview()"></div>`;
+  } else if (categoria === 'cierre_extraordinario') {
+    body.innerHTML = `<div class="date-row"><div><label class="field-label">Desde</label><input type="date" class="modal-input" id="f-fecha-desde" value="${today}" oninput="updatePreview()"></div><div><label class="field-label">Hasta (opcional)</label><input type="date" class="modal-input" id="f-fecha-hasta" oninput="updatePreview()"></div></div><label class="field-label">Motivo (opcional)</label><input type="text" class="modal-input" id="f-motivo-cierre" placeholder="Ej: mantenimiento, vacaciones del equipo" oninput="updatePreview()">`;
+  }
+  updatePreview();
+  document.getElementById('aviso-modal').classList.add('show');
+}
+
+function onMotivoChange() { const sel = document.getElementById('f-motivo'); document.getElementById('motivo-otro-wrap').style.display = sel.value === 'otro' ? 'block' : 'none'; }
+
+function getFormValues() {
+  const c = currentCategoria;
+  if (c === 'promocion' || c === 'aviso_operativo') return { texto: document.getElementById('f-texto').value, fecha_desde: document.getElementById('f-desde').value, fecha_hasta: document.getElementById('f-hasta').value || null };
+  if (c === 'apertura_especial') return { fecha: document.getElementById('f-fecha').value, horario: document.getElementById('f-horario').value, motivo: document.getElementById('f-motivo').value, motivo_otro: document.getElementById('f-motivo-otro') ? document.getElementById('f-motivo-otro').value : '' };
+  if (c === 'cierre_extraordinario') return { fecha_desde: document.getElementById('f-fecha-desde').value, fecha_hasta: document.getElementById('f-fecha-hasta').value || null, motivo: document.getElementById('f-motivo-cierre').value };
+  return {};
+}
+
+function updatePreview() {
+  const form = getFormValues();
+  const text = generateText(currentCategoria, form);
+  const box = document.getElementById('preview-box');
+  if (text) { document.getElementById('preview-text').textContent = text; box.style.display = 'block'; } else { box.style.display = 'none'; }
+}
+
+function closeModal() { document.getElementById('aviso-modal').classList.remove('show'); currentCategoria = null; }
+
+async function saveAviso() {
+  const form = getFormValues();
+  const texto = generateText(currentCategoria, form);
+  if (!texto) { toast('Completá los datos del aviso'); return; }
+  let fecha_desde, fecha_hasta;
+  if (currentCategoria === 'apertura_especial') { fecha_desde = form.fecha; fecha_hasta = form.fecha; }
+  else if (currentCategoria === 'cierre_extraordinario') { fecha_desde = form.fecha_desde; fecha_hasta = form.fecha_hasta || form.fecha_desde; }
+  else { fecha_desde = form.fecha_desde; fecha_hasta = form.fecha_hasta; }
+  const { count } = await sb.from('airis_avisos').select('id', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).eq('activo', true);
+  if ((count || 0) >= MAX_ACTIVOS) { toast(`Máximo ${MAX_ACTIVOS} avisos activos. Desactivá uno primero.`); return; }
+  const { error } = await sb.from('airis_avisos').insert({ restaurant_id: restaurant.id, categoria: currentCategoria, texto, datos: form, fecha_desde, fecha_hasta, activo: true });
+  if (error) { toast('Error al guardar'); console.error(error); return; }
+  closeModal(); toast('✓ Aviso creado'); loadAvisos();
+}
+
+async function loadAvisos() {
+  const { data, error } = await sb.from('airis_avisos').select('*').eq('restaurant_id', restaurant.id).order('created_at', { ascending: false });
+  const list = document.getElementById('avisos-list');
+  const limitNote = document.getElementById('limit-note');
+  if (error) { list.innerHTML = '<div class="empty-state"><div class="empty-state-text">Error al cargar avisos</div></div>'; return; }
+  if (!data || data.length === 0) { list.innerHTML = `<div class="empty-state"><div class="empty-state-icon"><i class="ti ti-bell-off"></i></div><div class="empty-state-text">No hay avisos creados todavía</div></div>`; limitNote.style.display = 'none'; return; }
+  const activos = data.filter(a => a.activo).length;
+  limitNote.style.display = activos >= MAX_ACTIVOS ? 'block' : 'none';
+  list.innerHTML = data.map(a => {
+    const info = CATEGORIA_INFO[a.categoria] || CATEGORIA_INFO.aviso_operativo;
+    let dates = '';
+    if (a.fecha_desde && a.fecha_hasta && a.fecha_desde !== a.fecha_hasta) dates = `Vigente ${formatShort(a.fecha_desde)} — ${formatShort(a.fecha_hasta)}`;
+    else if (a.fecha_desde && a.fecha_hasta) dates = `Vigente ${formatShort(a.fecha_desde)}`;
+    else if (a.fecha_desde) dates = `Vigente desde ${formatShort(a.fecha_desde)} sin fecha de fin`;
+    return `<div class="aviso-card"><div class="aviso-top"><div class="aviso-cat ${a.categoria}"><i class="ti ${info.icon}"></i> ${info.label}</div><div class="aviso-actions"><div class="toggle ${a.activo ? 'on' : ''}" onclick="toggleAviso('${a.id}', ${a.activo})"></div><div class="delete-btn" onclick="deleteAviso('${a.id}')"><i class="ti ti-trash" style="font-size:13px"></i></div></div></div><div class="aviso-text">${a.texto}</div><div class="aviso-dates">${dates}</div></div>`;
+  }).join('');
+}
+
+async function toggleAviso(id, current) {
+  if (!current) { const { count } = await sb.from('airis_avisos').select('id', { count: 'exact', head: true }).eq('restaurant_id', restaurant.id).eq('activo', true); if ((count || 0) >= MAX_ACTIVOS) { toast(`Máximo ${MAX_ACTIVOS} avisos activos. Desactivá uno primero.`); return; } }
+  await sb.from('airis_avisos').update({ activo: !current }).eq('id', id); loadAvisos();
+}
+
+async function deleteAviso(id) {
+  if (!confirm('¿Eliminar este aviso? No se puede deshacer.')) return;
+  await sb.from('airis_avisos').delete().eq('id', id); toast('Aviso eliminado'); loadAvisos();
+}
+
+let toastTimer;
+function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2500); }
+
+document.getElementById('aviso-modal').addEventListener('click', e => { if (e.target.id === 'aviso-modal') closeModal(); });
+
+init();
+</script>
+</body>
+</html>
