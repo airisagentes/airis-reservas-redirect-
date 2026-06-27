@@ -358,10 +358,6 @@
   <div class="sheet-details" id="sheet-details"></div>
   <div class="sheet-actions" id="sheet-actions"></div>
 </div>
-<button id="mobile-pending-btn" onclick="openPendingModal()" title="Reservas sin asignar" style="display:none">
-  <i class="ti ti-calendar-plus"></i>
-  <span id="pending-badge" style="position:absolute;top:-4px;right:-4px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;align-items:center;justify-content:center;display:none"></span>
-</button>
 <button id="mobile-waitlist-btn" onclick="openWaitlistModal()" title="Lista de espera" style="display:none"><i class="ti ti-clock"></i></button>
 <button id="mobile-nueva-reserva-btn" onclick="openNuevaReservaModal()" title="Nueva reserva" style="display:none"><i class="ti ti-calendar-plus"></i></button>
 
@@ -803,9 +799,9 @@ async function loadPendingReservations(){
   renderPendingReservations(pending);
 }
 function renderPendingReservations(items){
-  const panel=document.getElementById('pending-res-panel'); const badge=document.getElementById('pending-badge'); const mobileBtn=document.getElementById('mobile-pending-btn');
-  if(badge) badge.style.display='none';
-  if(mobileBtn) mobileBtn.style.display='none';
+  const panel=document.getElementById('pending-res-panel');
+  const fabBtn=document.getElementById('fab-btn');
+  if(fabBtn){ if(items.length>0){ fabBtn.style.background='var(--occupied)'; fabBtn.title=`${items.length} reserva${items.length>1?'s':''} sin asignar`; } else { fabBtn.style.background='var(--accent)'; fabBtn.title=''; } }
   if(!panel) return;
   if(!items.length){panel.innerHTML=`<div style="text-align:center;padding:8px 0;font-size:11px;color:var(--text3)">Sin reservas pendientes</div>`;return;}
   panel.innerHTML=items.map(r=>`<div class="waitlist-item" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="waitlist-name">${r.client_name}</div><div class="waitlist-info">${r.people_count||1} personas \u00b7 ${formatTime(r.reserved_at)}</div>${r.notes?`<div class="waitlist-info" style="color:var(--accent);margin-top:2px">&#128221; ${r.notes}</div>`:''}</div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;margin-left:8px"><div class="waitlist-assign" onclick="openAssignTableModal('${r.id}')">Asignar</div><div class="waitlist-cancel" onclick="cancelPendingReservation('${r.id}')">Cancelar</div><div class="waitlist-noshow" onclick="noshowPendingReservation('${r.id}')">No-show</div></div></div>`).join('');
