@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#0D0C1A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Airis Mesas">
+  <title>Airis — Salón en vivo</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --accent: #6C63FF; --accent-dim: rgba(108,99,255,0.15); --accent-border: rgba(108,99,255,0.35);
+      --bg: #0D0C1A; --bg2: #131222; --bg3: #201F30; --card: #1D1C2E;
+      --border: rgba(255,255,255,0.07); --text: #F2EFFF; --text2: #9490B5; --text3: #56527A;
+      --free: #4ade80; --free-bg: rgba(34,197,94,0.10); --reserved: #6C63FF;
+      --reserved-bg: rgba(108,99,255,0.12); --occupied: #F4857A; --occupied-bg: rgba(244,133,122,0.12);
+      --blocked: #6B7280; --blocked-bg: rgba(107,114,128,0.10);
+      --waiting: #38bdf8; --waiting-bg: rgba(56,189,248,0.10); --radius: 12px; --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Bricolage Grotesque', -apple-system, sans-serif; overflow: hidden; }
+    #pin-screen { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 32px; }
+    .pin-logo { font-size: 28px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
+    .pin-sub { font-size: 13px; color: var(--text2); margin-top: -24px; }
+    .pin-dots { display: flex; gap: 14px; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bg3); border: 1.5px solid var(--border); transition: all 0.2s; }
+    .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+    .pin-pad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
+    .pin-btn { width: 72px; height: 72px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-size: 22px; font-weight: 400; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+    .pin-btn:active { background: var(--accent-dim); border-color: var(--accent); transform: scale(0.95); }
+    .pin-btn.del { font-size: 16px; color: var(--text2); }
+    .pin-error { color: var(--occupied); font-size: 13px; opacity: 0; transition: opacity 0.3s; }
+    .pin-error.show { opacity: 1; }
+    #topbar { height: 52px; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; flex-shrink: 0; }
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .logo-mark { height: 30px; display: flex; align-items: center; }
+    .logo-mark img { height: 30px; width: auto; }
+    .airis-chip { background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; padding: 5px 10px; border-radius: 8px; flex-shrink: 0; }
+    .restaurant-name { font-size: 13px; color: var(--text); margin-left: 4px; font-weight: 500; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .live-badge { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--free); }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--free); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .time-display { font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+    .date-picker-btn { font-size: 12px; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 20px; padding: 4px 10px; cursor: pointer; display: flex; align-items: center; gap: 5px; text-decoration: none; }
+    #derivaciones-btn { position: relative; }
+    #derivaciones-btn.tiene-derivaciones { background: var(--occupied-bg); border-color: rgba(244,133,122,0.4); color: var(--occupied); animation: derivacion-pulse 2s infinite; }
+    @keyframes derivacion-pulse { 0%,100%{opacity:1} 50%{opacity:0.75} }
+    #derivaciones-badge { display: none; position: absolute; top: -6px; right: -6px; background: var(--occupied); color: #fff; font-size: 9px; font-weight: 700; border-radius: 50%; width: 16px; height: 16px; align-items: center; justify-content: center; }
+    #summary-btn { display: none; }
+    #tabs-bar { height: 44px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; padding: 0 16px; gap: 4px; flex-shrink: 0; overflow-x: auto; }
+    #tabs-bar::-webkit-scrollbar { display: none; }
+    .tab-btn { padding: 8px 16px 10px; font-size: 13px; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.2s; }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    #app { display: flex; flex-direction: column; height: 100vh; }
+    #main { display: flex; flex: 1; overflow: hidden; }
+    #salon-area { flex: 1; overflow-y: auto; padding: 16px; }
+    #salon-area::-webkit-scrollbar { width: 4px; }
+    #salon-area::-webkit-scrollbar-track { background: transparent; }
+    #salon-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    #stats-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .stat-chip { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; border: 1px solid; }
+    .stat-chip.free { background: var(--free-bg); color: var(--free); border-color: rgba(34,197,94,0.25); }
+    .stat-chip.reserved { background: var(--reserved-bg); color: var(--accent); border-color: rgba(108,99,255,0.25); }
+    .stat-chip.occupied { background: var(--occupied-bg); color: var(--occupied); border-color: rgba(239,68,68,0.25); }
+    #tables-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+    .table-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 10px 10px; cursor: pointer; position: relative; transition: border-color 0.2s, transform 0.15s; border-left-width: 3px; min-height: 116px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+    .table-card:active { transform: scale(0.97); }
+    .table-card.selected { border-color: var(--accent) !important; background: rgba(108,99,255,0.08); }
+    .table-card.free { border-left-color: rgba(74,222,128,0.4); }
+    .table-card.reserved { border-left-color: var(--reserved); }
+    .table-card.occupied { border-left-color: var(--occupied); }
+    .table-card.blocked { border-left-color: var(--blocked); opacity: 0.6; }
+    .table-card.waiting { border-left-color: var(--waiting); }
+    .status-pill { position: absolute; top: 6px; right: 6px; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 10px; }
+    .pill-free { background: var(--free-bg); color: var(--free); }
+    .pill-reserved { background: var(--reserved-bg); color: var(--accent); }
+    .pill-occupied { background: var(--occupied-bg); color: var(--occupied); }
+    .pill-blocked { background: var(--blocked-bg); color: var(--blocked); }
+    .pill-waiting { background: var(--waiting-bg); color: var(--waiting); }
+    .table-icon { font-size: 28px; line-height: 1; color: rgba(255,255,255,0.35); }
+    .table-card.free .table-icon { color: rgba(34,197,94,0.45); }
+    .table-card.reserved .table-icon { color: rgba(108,99,255,0.7); }
+    .table-card.occupied .table-icon { color: rgba(244,133,122,0.7); }
+    .table-card.waiting .table-icon { color: rgba(56,189,248,0.6); }
+    .table-number { font-size: 16px; font-weight: 600; color: var(--text); }
+    .table-cap { font-size: 10px; color: var(--text2); }
+    .table-client { font-size: 10px; color: var(--text2); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+    .table-time { font-size: 11px; color: var(--accent); font-weight: 600; text-align: center; }
+    .table-time.warning { color: var(--occupied); }
+    .table-wait { font-size: 10px; color: var(--text2); text-align: center; display: flex; align-items: center; justify-content: center; gap: 3px; }
+    .table-wait.warning { color: var(--occupied); }
+    #sidebar { width: 240px; background: var(--bg2); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+    #sidebar::-webkit-scrollbar { display: none; }
+    .sidebar-section { padding: 14px; border-bottom: 1px solid var(--border); }
+    .sidebar-label { font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+    .detail-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .detail-mesa-num { font-size: 22px; font-weight: 700; color: var(--text); }
+    .detail-status-badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 10px; }
+    .detail-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-key { font-size: 11px; color: var(--text2); }
+    .detail-val { font-size: 11px; color: var(--text); font-weight: 500; }
+    .no-selection { text-align: center; padding: 24px 0; }
+    .no-selection-icon { font-size: 32px; opacity: 0.2; margin-bottom: 8px; color: var(--accent); }
+    .no-selection-text { font-size: 12px; color: var(--text3); }
+    .action-btn { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; gap: 8px; background: var(--bg3); color: var(--text); transition: all 0.15s; margin-bottom: 6px; }
+    .action-btn:last-child { margin-bottom: 0; }
+    .action-btn:active { transform: scale(0.98); }
+    .action-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .action-btn.danger { background: var(--occupied-bg); border-color: rgba(239,68,68,0.3); color: var(--occupied); }
+    .action-btn.warning { background: var(--reserved-bg); border-color: rgba(245,158,11,0.3); color: var(--reserved); }
+    .action-btn.success { background: var(--free-bg); border-color: rgba(34,197,94,0.3); color: var(--free); }
+    .action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    #footer { height: 42px; background: var(--bg); border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 16px; flex-shrink: 0; gap: 3px; }
+    .footer-brand { font-size: 10px; color: var(--accent); letter-spacing: 0.04em; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; justify-content: center; z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+    .modal { background: var(--bg2); border-radius: 16px 16px 0 0; border-top: 1px solid var(--border); padding: 20px 20px 36px; width: 100%; max-width: 480px; transform: translateY(100%); transition: transform 0.3s ease; max-height: 85vh; display: flex; flex-direction: column; }
+    .modal-overlay.show .modal { transform: translateY(0); }
+    .modal-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    #modal-body { overflow-y: auto; flex: 1 1 auto; -webkit-overflow-scrolling: touch; }
+    .modal-input { width: 100%; padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; margin-bottom: 12px; }
+    .modal-input:focus { outline: none; border-color: var(--accent); }
+    .modal-input::placeholder { color: var(--text3); }
+    .modal-btns { display: flex; gap: 8px; flex-shrink: 0; padding-top: 12px; }
+    .modal-btn { flex: 1; padding: 11px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); }
+    .modal-btn.confirm { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .modal-btn.cancel { background: var(--bg3); color: var(--text2); }
+    .date-input { width: 100%; padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; margin-bottom: 12px; }
+    .date-input:focus { outline: none; border-color: var(--accent); }
+    #toast { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 18px; font-size: 13px; color: var(--text); z-index: 200; opacity: 0; transition: all 0.3s; white-space: nowrap; pointer-events: none; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #loading { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 90; }
+    .loading-logo { font-size: 32px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
+    .loading-bar { width: 120px; height: 2px; background: var(--bg3); border-radius: 1px; overflow: hidden; }
+    .loading-progress { height: 100%; background: var(--accent); border-radius: 1px; animation: load 1.5s ease-in-out infinite; }
+    @keyframes load { 0%{width:0%;margin-left:0} 50%{width:80%;margin-left:10%} 100%{width:0%;margin-left:100%} }
+    .waitlist-item { background: var(--bg3); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); }
+    .waitlist-name { font-size: 12px; font-weight: 500; color: var(--text); }
+    .waitlist-info { font-size: 10px; color: var(--text2); }
+    .waitlist-assign { font-size: 11px; color: var(--accent); cursor: pointer; padding: 4px 8px; border: 1px solid var(--accent-border); border-radius: 4px; background: var(--accent-dim); }
+    .waitlist-call { font-size: 11px; color: var(--free); cursor: pointer; padding: 4px 8px; border: 1px solid rgba(74,222,128,0.3); border-radius: 4px; background: var(--free-bg); }
+    .waitlist-cancel { font-size: 11px; color: var(--occupied); cursor: pointer; padding: 4px 8px; border: 1px solid rgba(244,133,122,0.3); border-radius: 4px; background: var(--occupied-bg); }
+    .waitlist-noshow { font-size: 11px; color: #f59e0b; cursor: pointer; padding: 4px 8px; border: 1px solid rgba(245,158,11,0.3); border-radius: 4px; background: rgba(245,158,11,0.1); }
+    #mobile-sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    #mobile-sheet-overlay.show { opacity: 1; pointer-events: all; }
+    #mobile-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); border-radius: 20px 20px 0 0; border-top: 1px solid var(--border); z-index: 61; transform: translateY(100%); transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1); max-height: 85vh; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom, 20px); }
+    #mobile-sheet.show { transform: translateY(0); }
+    .sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; }
+    .sheet-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+    .sheet-mesa-info { display: flex; align-items: center; gap: 10px; }
+    .sheet-mesa-num { font-size: 20px; font-weight: 700; color: var(--text); }
+    .sheet-status-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+    .sheet-close { width: 32px; height: 32px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .sheet-details { padding: 12px 20px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .sheet-detail-item { background: var(--bg3); border-radius: var(--radius-sm); padding: 8px 10px; }
+    .sheet-detail-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+    .sheet-detail-val { font-size: 13px; font-weight: 600; color: var(--text); }
+    .sheet-actions { padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+    .sheet-action-btn { width: 100%; padding: 14px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 600; border: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; gap: 10px; background: var(--bg3); color: var(--text); transition: all 0.15s; }
+    .sheet-action-btn:active { transform: scale(0.98); opacity: 0.85; }
+    .sheet-action-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sheet-action-btn.danger { background: var(--occupied-bg); border-color: rgba(239,68,68,0.25); color: var(--occupied); }
+    .sheet-action-btn.warning { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.25); color: #f59e0b; }
+    .sheet-action-btn.success { background: var(--free-bg); border-color: rgba(34,197,94,0.25); color: var(--free); }
+    .sheet-action-icon { font-size: 18px; }
+    #mobile-waitlist-btn { display: none; }
+    #mobile-pending-btn { display: none; }
+    #mobile-nueva-reserva-btn { display: none; }
+    #bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 64px; background: var(--bg2); border-top: 1px solid var(--border); z-index: 40; align-items: center; justify-content: space-around; padding: 0 4px; padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .bn-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 12px; cursor: pointer; position: relative; border: none; background: none; }
+    .bn-item i { font-size: 22px; color: var(--text3); transition: color 0.15s; }
+    .bn-item span { font-size: 9px; color: var(--text3); font-weight: 500; transition: color 0.15s; }
+    .bn-item.active i { color: var(--accent); }
+    .bn-item.active span { color: var(--accent); }
+    .bn-item.alert i { color: var(--occupied); }
+    .bn-item.alert span { color: var(--occupied); }
+    .bn-badge { position: absolute; top: 4px; right: 6px; background: var(--occupied); color: #fff; font-size: 8px; font-weight: 700; border-radius: 50%; width: 14px; height: 14px; display: none; align-items: center; justify-content: center; }
+    .bn-badge.show { display: flex; }
+    .bn-plus { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); border: none; color: #fff; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+    .bn-plus.open { transform: rotate(45deg); background: var(--occupied); }
+    #fab-menu { display: none; position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%); background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px; z-index: 41; min-width: 200px; }
+    #fab-menu.show { display: block; }
+    .fab-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; color: var(--text); transition: background 0.15s; border: none; background: none; width: 100%; }
+    .fab-item:hover { background: var(--bg3); }
+    .fab-item i { font-size: 18px; color: var(--accent); }
+    #fab-overlay { display: none; position: fixed; inset: 0; z-index: 39; }
+    #fab-overlay.show { display: block; }
+    .sb-tab { flex: 1; padding: 10px 6px; font-size: 10px; color: var(--text3); text-align: center; cursor: pointer; border-bottom: 2px solid transparent; border-left: none; border-right: none; border-top: none; font-weight: 500; background: none; font-family: inherit; transition: all 0.15s; }
+    .sb-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent-dim); }
+    .sb-panel { overflow-y: auto; }
+    #sidebar { display: flex; flex-direction: column; }
+    #desktop-bottombar { display: none; height: 64px; background: #0A0918; border-top: 1px solid var(--border); flex-shrink: 0; align-items: center; justify-content: space-around; padding: 0 16px; }
+    .dbb-item { display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 10px; cursor: pointer; border: none; background: none; color: var(--text2); font-size: 13px; font-family: inherit; font-weight: 500; transition: all 0.15s; white-space: nowrap; text-decoration: none; }
+    .dbb-item:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+    .dbb-item i { font-size: 18px; }
+    .dbb-item.primary { background: var(--accent); color: #fff; }
+    .dbb-item.primary:hover { background: #5a52e0; color: #fff; }
+    .dbb-item.has-alert { color: var(--occupied); }
+    .dbb-item.has-alert:hover { background: var(--occupied-bg); }
+    .dbb-alert-dot { width: 8px; height: 8px; background: var(--occupied); border-radius: 50%; display: none; position: absolute; top: 6px; right: 8px; }
+    .dbb-alert-dot.show { display: block; }
+    .cal-wrap { position: relative; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
+    .cal-wrap i { font-size: 18px; }
+    .cal-day { position: absolute; bottom: 0; font-size: 7px; font-weight: 700; color: var(--text2); line-height: 1; }
+    @media (max-width: 600px) {
+      #sidebar { display: none; } #footer { display: none; } #desktop-bottombar { display: none !important; }
+      #tables-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      .table-card { min-height: 90px; padding: 8px 6px; gap: 4px; }
+      .table-icon { font-size: 22px; } .table-number { font-size: 14px; } .table-cap { font-size: 9px; }
+      .table-client { font-size: 9px; max-width: 80px; } .table-time { font-size: 10px; }
+      #topbar { padding: 0 12px; position: relative; }
+      .topbar-left { position: absolute; left: 12px; }
+      .topbar-center { position: absolute; left: 50%; transform: translateX(-50%); }
+      .topbar-right { margin-left: auto; }
+      .airis-chip { font-size: 10px; padding: 3px 7px; }
+      .restaurant-name { font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+      .topbar-right .date-picker-btn { display: none; }
+      #derivaciones-btn { display: none; }
+      #avisos-link-text { display: none; }
+      #toast { bottom: 80px; }
+      #bottom-nav { display: flex; }
+      #salon-area { padding: 10px 10px 80px; }
+      #stats-bar { gap: 6px; }
+      .stat-chip { font-size: 10px; padding: 4px 8px; }
+      .live-badge span { display: none; }
+      #summary-btn { display: none; }
+    }
+    @media (min-width: 601px) {
+      #bottom-nav { display: none !important; }
+      #fab-menu { display: none !important; }
+      #desktop-bottombar { display: flex; }
+      #topbar { position: relative; }
+      .topbar-center { position: absolute; left: 50%; transform: translateX(-50%); }
+      .restaurant-name { font-size: 16px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+      #derivaciones-btn { display: none !important; }
+      .date-picker-btn { display: none; }
+      #summary-btn { display: none !important; }
+      .live-badge span { display: inline; }
+    }
+    @media (max-width: 900px) and (orientation: landscape) {
+      #sidebar { display: none; }
+      #tables-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+      .table-card { min-height: 80px; }
+      #bottom-nav { display: none !important; }
+      #desktop-bottombar { display: flex; }
+      #salon-area { padding-bottom: 64px; }
+    }
+  </style>
+</head>
+<body>
+<div id="loading"><div class="loading-logo">AIRIS</div><div class="loading-bar"><div class="loading-progress"></div></div></div>
+<div id="pin-screen" style="display:none">
+  <div class="pin-logo">AIRIS</div>
+  <div class="pin-sub">Ingresá tu PIN para continuar</div>
+  <div class="pin-dots"><div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div><div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div></div>
+  <div class="pin-pad">
+    <button class="pin-btn" onclick="pinPress('1')">1</button><button class="pin-btn" onclick="pinPress('2')">2</button><button class="pin-btn" onclick="pinPress('3')">3</button>
+    <button class="pin-btn" onclick="pinPress('4')">4</button><button class="pin-btn" onclick="pinPress('5')">5</button><button class="pin-btn" onclick="pinPress('6')">6</button>
+    <button class="pin-btn" onclick="pinPress('7')">7</button><button class="pin-btn" onclick="pinPress('8')">8</button><button class="pin-btn" onclick="pinPress('9')">9</button>
+    <button class="pin-btn" style="visibility:hidden"></button><button class="pin-btn" onclick="pinPress('0')">0</button><button class="pin-btn del" onclick="pinDel()">&#9003;</button>
+  </div>
+  <div class="pin-error" id="pin-error">PIN incorrecto. Intentá de nuevo.</div>
+</div>
+<div id="app" style="display:none">
+  <div id="topbar">
+    <div class="topbar-left">
+      <div class="airis-chip">airis.</div>
+    </div>
+    <div class="topbar-center">
+      <span class="restaurant-name" id="restaurant-name-display">Cargando...</span>
+    </div>
+    <div class="topbar-right">
+      <button class="date-picker-btn" id="summary-btn" onclick="openSummaryModal()"><i class="ti ti-chart-bar" style="font-size:13px"></i> Resumen</button>
+      <a class="date-picker-btn" href="/derivaciones.html" title="Derivaciones" id="derivaciones-btn" style="text-decoration:none"><i class="ti ti-message-2" style="font-size:13px"></i> <span id="derivaciones-link-text">Derivaciones</span><span id="derivaciones-badge"></span></a>
+      <a class="date-picker-btn" href="/avisos.html" title="Avisos" style="text-decoration:none"><i class="ti ti-bell" style="font-size:13px"></i> <span id="avisos-link-text">Avisos</span></a>
+      <div class="live-badge"><div class="live-dot"></div><span>En vivo</span></div>
+      <div class="time-display" id="clock">--:--</div>
+    </div>
+  </div>
+  <div id="tabs-bar"></div>
+  <div id="main">
+    <div id="salon-area">
+      <div id="stats-bar">
+        <div class="stat-chip free">&#9679; <span id="stat-free">0</span> Libres</div>
+        <div class="stat-chip reserved">&#9679; <span id="stat-reserved">0</span> Reservadas</div>
+        <div class="stat-chip occupied">&#9679; <span id="stat-occupied">0</span> Ocupadas</div>
+      </div>
+      <div id="tables-grid"></div>
+    </div>
+    <script>document.getElementById('salon-area').addEventListener('click', function(e) { if (!e.target.closest('.table-card') && !e.target.closest('#stats-bar') && !e.target.closest('#tabs-bar')) deselectTable(); });</script>
+    <div id="sidebar">
+      <div id="sb-tabs" style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <button class="sb-tab active" onclick="switchSbTab('info',this)"><i class="ti ti-info-circle" style="font-size:14px;display:block;margin:0 auto 2px"></i>Info</button>
+        <button class="sb-tab" onclick="switchSbTab('reservas',this)"><i class="ti ti-calendar-check" style="font-size:14px;display:block;margin:0 auto 2px"></i>Reservas</button>
+        <button class="sb-tab" onclick="switchSbTab('espera',this)"><i class="ti ti-clock" style="font-size:14px;display:block;margin:0 auto 2px"></i>Espera</button>
+      </div>
+      <div id="sb-info" class="sb-panel">
+        <div class="sidebar-section">
+          <div class="sidebar-label">Resumen del turno</div>
+          <div id="turno-summary" style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="font-size:11px;color:var(--text2)">Reservas hoy</span><span style="font-size:11px;color:var(--text);font-weight:600" id="summary-total">—</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="font-size:11px;color:var(--text2)">Próxima reserva</span><span style="font-size:11px;color:var(--accent);font-weight:600" id="summary-next">—</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="font-size:11px;color:var(--text2)">Ocupación ahora</span><span style="font-size:11px;color:var(--text);font-weight:600" id="summary-occ">—</span></div>
+          </div>
+        </div>
+        <div class="sidebar-section" id="detail-panel">
+          <div class="sidebar-label">Mesa seleccionada</div>
+          <div class="no-selection"><div class="no-selection-icon"><i class="ti ti-layout-grid"></i></div><div class="no-selection-text">Tocá una mesa para ver su detalle</div></div>
+        </div>
+        <div class="sidebar-section"><div class="sidebar-label">Acciones</div><div id="actions-panel"><div style="text-align:center;padding:16px 0;font-size:12px;color:var(--text3)">Seleccióná una mesa</div></div></div>
+      </div>
+      <div id="sb-reservas" class="sb-panel" style="display:none">
+        <div class="sidebar-section">
+          <div class="sidebar-label">Reservas sin asignar</div>
+          <div id="pending-res-panel"><div style="text-align:center;padding:8px 0;font-size:11px;color:var(--text3)">Cargando...</div></div>
+          <div style="font-size:10px;color:var(--text3);margin-top:6px">Tocá "Asignar" y elegí la mesa de destino</div>
+        </div>
+      </div>
+      <div id="sb-espera" class="sb-panel" style="display:none">
+        <div class="sidebar-section">
+          <div class="sidebar-label">Lista de espera</div>
+          <div id="waitlist-panel"><div style="text-align:center;padding:8px 0;font-size:11px;color:var(--text3)">Sin clientes en espera</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="footer" style="display:none"><span class="footer-brand">Airis | Gastronomía Inteligente</span></div>
+  <div id="desktop-bottombar">
+    <button class="dbb-item primary" onclick="openNuevaReservaModal()"><i class="ti ti-plus"></i> Nueva reserva</button>
+    <button class="dbb-item" onclick="openWaitlistModal()"><i class="ti ti-clock"></i> Agregar a espera</button>
+    <button class="dbb-item" onclick="openDateModal()">
+      <div class="cal-wrap"><i class="ti ti-calendar"></i><span class="cal-day" id="cal-day-num">26</span></div>
+      Calendario
+    </button>
+    <a class="dbb-item" href="/derivaciones.html" id="dbb-derivaciones" style="text-decoration:none;position:relative">
+      <i class="ti ti-message-2"></i> Derivaciones
+      <span class="dbb-alert-dot" id="dbb-alert-dot"></span>
+    </a>
+    <a class="dbb-item" href="/avisos.html" style="text-decoration:none"><i class="ti ti-bell"></i> Avisos</a>
+  </div>
+</div>
+<div id="mobile-sheet-overlay" onclick="closeMobileSheet()"></div>
+<div id="mobile-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-mesa-info"><div class="sheet-mesa-num" id="sheet-mesa-num">Mesa —</div><div class="sheet-status-badge" id="sheet-status-badge"></div></div>
+    <button class="sheet-close" onclick="closeMobileSheet()"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="sheet-details" id="sheet-details"></div>
+  <div class="sheet-actions" id="sheet-actions"></div>
+</div>
+<button id="mobile-pending-btn" onclick="openPendingModal()" title="Reservas sin asignar" style="display:none">
+  <i class="ti ti-calendar-plus"></i>
+  <span id="pending-badge" style="position:absolute;top:-4px;right:-4px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;align-items:center;justify-content:center;display:none"></span>
+</button>
+<button id="mobile-waitlist-btn" onclick="openWaitlistModal()" title="Lista de espera" style="display:none"><i class="ti ti-clock"></i></button>
+<button id="mobile-nueva-reserva-btn" onclick="openNuevaReservaModal()" title="Nueva reserva" style="display:none"><i class="ti ti-calendar-plus"></i></button>
+
+<div id="fab-overlay" onclick="closeFabMenu()"></div>
+<div id="fab-menu">
+  <button class="fab-item" onclick="closeFabMenu();openNuevaReservaModal()"><i class="ti ti-plus"></i> Nueva reserva</button>
+  <button class="fab-item" onclick="closeFabMenu();openWaitlistModal()"><i class="ti ti-clock"></i> Agregar a espera</button>
+  <button class="fab-item" onclick="closeFabMenu();openPendingModal()"><i class="ti ti-list-check"></i> Reservas sin asignar</button>
+  <button class="fab-item" onclick="closeFabMenu();openSummaryModal()"><i class="ti ti-chart-bar"></i> Resumen del turno</button>
+</div>
+
+<div id="bottom-nav">
+  <button class="bn-item active" onclick="window.location.href='/index.html'">
+    <i class="ti ti-layout-grid"></i>
+    <span>Salón</span>
+  </button>
+  <button class="bn-item" id="bn-derivaciones" onclick="window.location.href='/derivaciones.html'">
+    <i class="ti ti-message-2"></i>
+    <span id="bn-deriv-badge" class="bn-badge"></span>
+    <span>Derivaciones</span>
+  </button>
+  <button class="bn-plus" id="fab-btn" onclick="toggleFabMenu()" aria-label="Acciones rápidas">
+    <i class="ti ti-plus"></i>
+  </button>
+  <button class="bn-item" onclick="window.location.href='/avisos.html'">
+    <i class="ti ti-bell"></i>
+    <span>Avisos</span>
+  </button>
+  <button class="bn-item" onclick="openDateModal()">
+    <i class="ti ti-calendar"></i>
+    <span>Calendario</span>
+  </button>
+</div>
+
+<div class="modal-overlay" id="nueva-reserva-modal">
+  <div class="modal">
+    <div class="modal-title">&#128203; Nueva reserva manual</div>
+    <div id="modal-body-nueva-reserva" style="overflow-y:auto;flex:1 1 auto;-webkit-overflow-scrolling:touch;">
+      <select class="modal-input" id="nr-salon" style="cursor:pointer" onchange="onSalonOFechaChange()"><option value="">Seleccióná el salón</option></select>
+      <input class="modal-input" id="nr-name" placeholder="Nombre del cliente">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;color:var(--text2);white-space:nowrap" id="nr-prefix">+549</div>
+        <input class="modal-input" id="nr-phone" type="tel" placeholder="Teléfono" style="margin:0;flex:1">
+      </div>
+      <input class="modal-input" id="nr-date" type="date" onchange="onSalonOFechaChange()">
+      <select class="modal-input" id="nr-time" style="cursor:pointer"><option value="">Seleccióná salón y fecha primero</option></select>
+      <select class="modal-input" id="nr-people" style="cursor:pointer">
+        <option value="">Cantidad de personas</option>
+        <option value="1">1 persona</option><option value="2">2 personas</option><option value="3">3 personas</option><option value="4">4 personas</option>
+        <option value="5">5 personas</option><option value="6">6 personas</option><option value="7">7 personas</option><option value="8">8 personas</option>
+        <option value="9">9 personas</option><option value="10">10 personas</option><option value="11">11 personas</option><option value="12">12 personas</option>
+        <option value="13">13 personas</option><option value="14">14 personas</option><option value="15">15 personas</option><option value="16">16 personas</option>
+        <option value="17">17 personas</option><option value="18">18 personas</option><option value="19">19 personas</option><option value="20">20 personas</option>
+      </select>
+      <input class="modal-input" id="nr-notes" placeholder="Notas / alergias (opcional)">
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeModal('nueva-reserva-modal')">Cancelar</button>
+      <button class="modal-btn confirm" onclick="confirmarNuevaReserva()">Confirmar</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<div class="modal-overlay" id="action-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Acción</div>
+    <div id="modal-body"></div>
+    <div class="modal-btns"><button class="modal-btn cancel" onclick="closeModal('action-modal')">Cancelar</button><button class="modal-btn confirm" id="modal-confirm">Confirmar</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="date-modal-overlay">
+  <div class="modal">
+    <div class="modal-title">&#128197; Seleccionar fecha</div>
+    <input type="date" class="date-input" id="date-input">
+    <div class="modal-btns"><button class="modal-btn cancel" onclick="closeModal('date-modal-overlay')">Cancelar</button><button class="modal-btn confirm" onclick="applyDate()">Ver este día</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="waitlist-modal">
+  <div class="modal">
+    <div class="modal-title">&#128100; Agregar a lista de espera</div>
+    <input class="modal-input" id="wl-name" placeholder="Nombre del cliente">
+    <input class="modal-input" id="wl-people" type="number" placeholder="Cantidad de personas" min="1" max="20">
+    <div style="display:flex;gap:8px;align-items:center">
+      <div id="wl-prefix" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;color:var(--text2);white-space:nowrap">+549</div>
+      <input class="modal-input" id="wl-phone" type="tel" placeholder="Teléfono (opcional)" style="margin:0;flex:1">
+    </div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="modal-btn cancel" onclick="closeModal('waitlist-modal')">Cancelar</button>
+      <button class="modal-btn confirm" onclick="addToWaitlist()">Agregar</button>
+    </div>
+  </div>
+</div>
+<script>
+const SUPABASE_URL = 'https://wjfmzzkvmeznfvoczwda.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZm16emt2bWV6bmZ2b2N6d2RhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMjgwNTMsImV4cCI6MjA5NjgwNDA1M30.V34mXq1OiL3o_9FsVFGpAYUCCoeKifgqUy0_TwqehsI';
+const RESTAURANT_SLUG = 'pura-vida';
+const PIN_STORAGE_KEY = 'airis_pin_auth';
+const PIN_EXPIRY_DAYS = 30;
+const GHL_TOKEN = 'pit-6980ba1a-cfb1-4bd4-8b4e-e5230bec1c14';
+const GHL_PIPELINE_ID = 'OxSaaTaUtDeMxMy6tdYJ';
+const GHL_STAGES = { seated:'4e355baf-2395-450e-a024-6f31cceaffea', released:'1ea9f3e3-ca8c-45f2-94b0-472098669ece', cancelled:'77f9376d-c23f-42a0-8c73-a6260b174a81', noshow:'67a53507-122a-4208-ba50-599cffba3289' };
+const N8N_LLAMAR_ESPERA_URL = 'https://n8n-n8n.hovq6t.easypanel.host/webhook/llamar-cliente-espera';
+const TZ_OFFSETS = { 'America/Argentina/Mendoza':'-03:00','America/Argentina/Buenos_Aires':'-03:00','America/Santiago':'-04:00','America/Bogota':'-05:00','America/Mexico_City':'-06:00','America/Lima':'-05:00','America/Montevideo':'-03:00','America/Asuncion':'-04:00','Europe/Madrid':'+02:00' };
+let sb, restaurant, rooms = [], tables = [], tableStatuses = {};
+let selectedTable = null, currentRoom = null, currentDate = new Date();
+let pinBuffer = '';
+
+// ── PLACEHOLDER DINÁMICO POR PAÍS ──────────────────────────────────────────
+function getPhonePlaceholder() {
+  const placeholders = {
+    'AR': 'Ej: 2617610369 (sin 0 ni 15)',
+    'CL': 'Ej: 912345678 (sin 0 inicial)',
+    'CO': 'Ej: 3001234567',
+    'PE': 'Ej: 912345678',
+    'MX': 'Ej: 5512345678',
+    'UY': 'Ej: 91234567 (sin 0 inicial)',
+    'PY': 'Ej: 981234567 (sin 0 inicial)',
+    'ES': 'Ej: 612345678 (sin 0 inicial)',
+    'US': 'Ej: 3051234567'
+  };
+  return placeholders[restaurant?.country_code] || 'Ej: número sin código de país';
+}
+// ───────────────────────────────────────────────────────────────────────────
+
+async function init() { sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON); await loadData(); checkAuth(); }
+async function loadData() {
+  const { data: r } = await sb.from('restaurants').select('*').eq('slug', RESTAURANT_SLUG).single();
+  restaurant = r;
+  const { data: ro } = await sb.from('rooms').select('*').eq('restaurant_id', r.id).eq('active', true).order('sort_order');
+  rooms = ro || [];
+  const { data: t } = await sb.from('tables').select('*').eq('restaurant_id', r.id).eq('active', true);
+  tables = t || [];
+  const { data: ts } = await sb.from('table_status').select('*, reservations(*)').eq('restaurant_id', r.id);
+  if (ts) ts.forEach(s => { tableStatuses[s.table_id] = s; });
+  await loadWaitlist();
+  sb.channel('table_status_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'table_status', filter: `restaurant_id=eq.${r.id}` }, handleStatusChange).subscribe();
+  sb.channel('reservation_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'reservations', filter: `restaurant_id=eq.${r.id}` }, () => refreshStatuses()).subscribe();
+}
+async function refreshStatuses() {
+  const { data: ts } = await sb.from('table_status').select('*, reservations(*)').eq('restaurant_id', restaurant.id);
+  if (ts) { tableStatuses = {}; ts.forEach(s => { tableStatuses[s.table_id] = s; }); }
+  renderGrid(); updateStats(); updateTurnoSummary(); loadPendingReservations();
+  if (selectedTable) updateSidebar();
+}
+function handleStatusChange(payload) {
+  const s = payload.new;
+  if (s) tableStatuses[s.table_id] = { ...tableStatuses[s.table_id], ...s };
+  renderGrid(); updateStats(); updateTurnoSummary();
+  if (selectedTable && selectedTable.id === s?.table_id) updateSidebar();
+}
+async function updateTurnoSummary() {
+  if (!currentRoom || !restaurant) return;
+  const tz = restaurant.timezone || 'America/Argentina/Mendoza';
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-CA', { timeZone: tz });
+  const start = new Date(todayStr + 'T00:00:00');
+  const end = new Date(todayStr + 'T23:59:59');
+  const { data } = await sb.from('reservations').select('*').eq('restaurant_id', restaurant.id).eq('room_id', currentRoom.id).gte('reserved_at', start.toISOString()).lte('reserved_at', end.toISOString());
+  const todayRes = (data || []).filter(r => r.status !== 'cancelled');
+  document.getElementById('summary-total').textContent = todayRes.length;
+  const nowMs = now.getTime();
+  const upcoming = todayRes
+    .filter(r => !['cancelled','noshow','finished','seated'].includes(r.status) && new Date(r.reserved_at).getTime() > nowMs)
+    .sort((a,b) => new Date(a.reserved_at) - new Date(b.reserved_at));
+  document.getElementById('summary-next').textContent = upcoming.length ? formatTime(upcoming[0].reserved_at) : '—';
+  const roomTables = tables.filter(t => t.room_id === currentRoom.id);
+  const occupied = roomTables.filter(t => tableStatuses[t.id]?.status === 'occupied').length;
+  document.getElementById('summary-occ').textContent = `${occupied}/${roomTables.length}`;
+}
+function checkAuth() {
+  const stored = localStorage.getItem(PIN_STORAGE_KEY);
+  if (stored) { const { expiry } = JSON.parse(stored); if (Date.now() < expiry) { showApp(); return; } }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('pin-screen').style.display = 'flex';
+}
+function pinPress(digit) { if (pinBuffer.length >= 4) return; pinBuffer += digit; updatePinDots(); if (pinBuffer.length === 4) setTimeout(checkPin, 150); }
+function pinDel() { pinBuffer = pinBuffer.slice(0,-1); updatePinDots(); }
+function updatePinDots() { for (let i=0;i<4;i++) document.getElementById(`d${i}`).classList.toggle('filled', i < pinBuffer.length); }
+function checkPin() {
+  if (pinBuffer === restaurant.pin) {
+    localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify({ expiry: Date.now() + PIN_EXPIRY_DAYS*86400000 }));
+    document.getElementById('pin-screen').style.display = 'none'; showApp();
+  } else {
+    document.getElementById('pin-error').classList.add('show'); pinBuffer = ''; updatePinDots();
+    setTimeout(() => document.getElementById('pin-error').classList.remove('show'), 2000);
+  }
+}
+function showApp() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('restaurant-name-display').textContent = restaurant.name;
+  buildTabs(); startClock(); setDateDisplay();
+  checkDerivaciones();
+  updateCalendarDay();
+  setInterval(checkDerivaciones, 30000);
+}
+function buildTabs() {
+  const bar = document.getElementById('tabs-bar'); bar.innerHTML = '';
+  rooms.forEach((room,i) => { const btn = document.createElement('div'); btn.className = 'tab-btn' + (i===0?' active':''); btn.textContent = room.name; btn.onclick = () => switchRoom(room, btn); bar.appendChild(btn); });
+  if (rooms.length > 0) { currentRoom = rooms[0]; renderGrid(); updateStats(); updateTurnoSummary(); loadPendingReservations(); }
+}
+function switchRoom(room, btn) {
+  currentRoom = room; selectedTable = null;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
+  renderGrid(); updateStats(); updateTurnoSummary(); loadPendingReservations(); resetSidebar();
+}
+function renderGrid() {
+  if (!currentRoom) return;
+  const grid = document.getElementById('tables-grid');
+  const roomTables = tables.filter(t => t.room_id === currentRoom.id);
+  grid.innerHTML = '';
+  roomTables.forEach(t => {
+    const status = tableStatuses[t.id]; const st = status?.status || 'free'; const res = status?.reservations;
+    const card = document.createElement('div');
+    card.className = `table-card ${st}${selectedTable?.id===t.id?' selected':''}`;
+    card.dataset.id = t.id;
+    const icons = { free:'<i class="ti ti-armchair"></i>', reserved:'<i class="ti ti-calendar-check"></i>', occupied:'<i class="ti ti-users"></i>', blocked:'<i class="ti ti-lock"></i>', waiting:'<i class="ti ti-clock"></i>' };
+    const labels = { free:'Libre', reserved:'Reservada', occupied:'Ocupada', blocked:'Bloqueada', waiting:'En espera' };
+    const timeLabel = st==='reserved'&&res?.reserved_at ? formatTime(res.reserved_at) : st==='occupied'&&res?.reserved_at ? '\u2191 '+formatTime(res.reserved_at) : '';
+    let waitInfo = '';
+    if (st==='reserved'&&res?.reserved_at) { const minsLate = Math.floor((Date.now()-new Date(res.reserved_at))/60000); if (minsLate>0) waitInfo = `<div class="table-wait${minsLate>=15?' warning':''}"><i class="ti ti-clock" style="font-size:10px"></i> ${minsLate}m</div>`; }
+    card.innerHTML = `<div class="status-pill pill-${st}">${labels[st]}</div><div class="table-icon">${icons[st]}</div><div class="table-number">Mesa ${t.number}</div><div class="table-cap">${t.capacity} pers.</div><div class="table-client">${res?.client_name||''}</div>${timeLabel?`<div class="table-time">${timeLabel}</div>`:''}${waitInfo}`;
+    card.onclick = () => selectTable(t);
+    grid.appendChild(card);
+  });
+}
+function updateStats() {
+  if (!currentRoom) return;
+  const roomTables = tables.filter(t => t.room_id === currentRoom.id);
+  const counts = { free:0, reserved:0, occupied:0 };
+  roomTables.forEach(t => { const st = tableStatuses[t.id]?.status||'free'; if (counts[st]!==undefined) counts[st]++; });
+  document.getElementById('stat-free').textContent = counts.free;
+  document.getElementById('stat-reserved').textContent = counts.reserved;
+  document.getElementById('stat-occupied').textContent = counts.occupied;
+}
+function isMobile() { return window.innerWidth<=600||(window.innerWidth<=900&&window.innerHeight<window.innerWidth); }
+function selectTable(t) {
+  selectedTable = t;
+  document.querySelectorAll('.table-card').forEach(c => c.classList.toggle('selected', c.dataset.id===t.id));
+  if (isMobile()) { openMobileSheet(t); } else { updateSidebar(); }
+}
+function openMobileSheet(t) {
+  const status = tableStatuses[t.id]; const st = status?.status||'free'; const res = status?.reservations;
+  const labels = { free:'Libre', reserved:'Reservada', occupied:'Ocupada', blocked:'Bloqueada', waiting:'En espera' };
+  const colors = { free:'var(--free)', reserved:'var(--accent)', occupied:'var(--occupied)', blocked:'var(--blocked)', waiting:'var(--waiting)' };
+  const bgs = { free:'var(--free-bg)', reserved:'var(--reserved-bg)', occupied:'var(--occupied-bg)', blocked:'var(--blocked-bg)', waiting:'var(--waiting-bg)' };
+  document.getElementById('sheet-mesa-num').textContent = `Mesa ${t.number}`;
+  const badge = document.getElementById('sheet-status-badge');
+  badge.textContent = labels[st]; badge.style.background = bgs[st]; badge.style.color = colors[st];
+  const details = document.getElementById('sheet-details');
+  let html = `<div class="sheet-detail-item"><div class="sheet-detail-label">Capacidad</div><div class="sheet-detail-val">${t.capacity} personas</div></div><div class="sheet-detail-item"><div class="sheet-detail-label">Sal\u00f3n</div><div class="sheet-detail-val">${currentRoom?.name||'\u2014'}</div></div>`;
+  if (res?.client_name) html += `<div class="sheet-detail-item"><div class="sheet-detail-label">Cliente</div><div class="sheet-detail-val">${res.client_name}</div></div><div class="sheet-detail-item"><div class="sheet-detail-label">Personas</div><div class="sheet-detail-val">${res.people_count||'\u2014'}</div></div>`;
+  if (res?.reserved_at) html += `<div class="sheet-detail-item" style="grid-column:1/-1"><div class="sheet-detail-label">Hora de reserva</div><div class="sheet-detail-val">${formatTime(res.reserved_at)}</div></div>`;
+  details.innerHTML = html;
+  const actions = document.getElementById('sheet-actions');
+  actions.innerHTML = '';
+  if (st==='reserved') {
+    actions.innerHTML += `<button class="sheet-action-btn primary" onclick="closeMobileSheet();doAction('seat')"><span class="sheet-action-icon">&#129681;</span> Sentar cliente</button>`;
+    actions.innerHTML += `<button class="sheet-action-btn warning" onclick="closeMobileSheet();doAction('noshow')"><span class="sheet-action-icon">&#9200;</span> Marcar No-show</button>`;
+    actions.innerHTML += `<button class="sheet-action-btn danger" onclick="closeMobileSheet();doAction('cancel')"><span class="sheet-action-icon">&#10005;</span> Cancelar reserva</button>`;
+  } else if (st==='occupied') {
+    actions.innerHTML += `<button class="sheet-action-btn success" onclick="closeMobileSheet();doAction('release')"><span class="sheet-action-icon">&#10003;</span> Liberar mesa</button>`;
+    actions.innerHTML += `<button class="sheet-action-btn" onclick="closeMobileSheet();doAction('move')"><span class="sheet-action-icon">&#8596;</span> Cambiar mesa</button>`;
+  } else if (st==='free') {
+    actions.innerHTML += `<button class="sheet-action-btn primary" onclick="closeMobileSheet();doAction('walkin')"><span class="sheet-action-icon">&#128100;</span> Cliente sin reserva</button>`;
+    actions.innerHTML += `<button class="sheet-action-btn" onclick="closeMobileSheet();doAction('block')"><span class="sheet-action-icon">&#128274;</span> Bloquear mesa</button>`;
+  } else if (st==='blocked') {
+    actions.innerHTML += `<button class="sheet-action-btn success" onclick="closeMobileSheet();doAction('unblock')"><span class="sheet-action-icon">&#128275;</span> Desbloquear</button>`;
+  } else if (st==='waiting') {
+    actions.innerHTML += `<button class="sheet-action-btn primary" onclick="closeMobileSheet();doAction('assign')"><span class="sheet-action-icon">&#10003;</span> Asignar a esta mesa</button>`;
+  }
+  document.getElementById('mobile-sheet-overlay').classList.add('show');
+  document.getElementById('mobile-sheet').classList.add('show');
+}
+function closeMobileSheet() { document.getElementById('mobile-sheet-overlay').classList.remove('show'); document.getElementById('mobile-sheet').classList.remove('show'); }
+function updateSidebar() {
+  if (!selectedTable) { resetSidebar(); return; }
+  // Forzar tab Info visible
+  document.querySelectorAll('.sb-tab').forEach(t => t.classList.remove('active'));
+  const infoTab = document.querySelector('.sb-tab:first-child');
+  if (infoTab) infoTab.classList.add('active');
+  document.getElementById('sb-info').style.display = '';
+  document.getElementById('sb-reservas').style.display = 'none';
+  document.getElementById('sb-espera').style.display = 'none';
+  const t = selectedTable; const status = tableStatuses[t.id]; const st = status?.status||'free'; const res = status?.reservations;
+  const labels = { free:'Libre', reserved:'Reservada', occupied:'Ocupada', blocked:'Bloqueada', waiting:'En espera' };
+  const colors = { free:'var(--free)', reserved:'var(--reserved)', occupied:'var(--occupied)', blocked:'var(--blocked)', waiting:'var(--waiting)' };
+  const bgs = { free:'var(--free-bg)', reserved:'var(--reserved-bg)', occupied:'var(--occupied-bg)', blocked:'var(--blocked-bg)', waiting:'var(--waiting-bg)' };
+  document.getElementById('detail-panel').innerHTML = `<div class="sidebar-label">Mesa seleccionada</div><div class="detail-header"><div class="detail-mesa-num">Mesa ${t.number}</div><div class="detail-status-badge" style="background:${bgs[st]};color:${colors[st]}">${labels[st]}</div></div>${res?`${res.client_name?`<div class="detail-row"><span class="detail-key">Cliente</span><span class="detail-val">${res.client_name}</span></div>`:''}<div class="detail-row"><span class="detail-key">Personas</span><span class="detail-val">${res.people_count}</span></div><div class="detail-row"><span class="detail-key">Hora</span><span class="detail-val">${formatTime(res.reserved_at)}</span></div>`:''}<div class="detail-row"><span class="detail-key">Capacidad</span><span class="detail-val">${t.capacity} personas</span></div><div class="detail-row"><span class="detail-key">Sal\u00f3n</span><span class="detail-val">${currentRoom?.name}</span></div>${status?.blocked_reason?`<div class="detail-row"><span class="detail-key">Motivo</span><span class="detail-val">${status.blocked_reason}</span></div>`:''}${res?.notes?`<div class="detail-row"><span class="detail-key">Notas</span><span class="detail-val" style="max-width:130px;text-align:right;word-break:break-word">${res.notes}</span></div>`:''}`;
+  const ap = document.getElementById('actions-panel');
+  ap.innerHTML = '';
+  if (st==='reserved') {
+    ap.innerHTML += `<button class="action-btn primary" onclick="doAction('seat')">&#129681; Sentar cliente</button>`;
+    ap.innerHTML += `<button class="action-btn warning" onclick="doAction('noshow')">&#9200; Marcar No-show</button>`;
+    ap.innerHTML += `<button class="action-btn danger" onclick="doAction('cancel')">&#10005; Cancelar reserva</button>`;
+  } else if (st==='occupied') {
+    ap.innerHTML += `<button class="action-btn success" onclick="doAction('release')">&#10003; Liberar mesa</button>`;
+    ap.innerHTML += `<button class="action-btn" onclick="doAction('move')">&#8596; Cambiar mesa</button>`;
+  } else if (st==='free') {
+    ap.innerHTML += `<button class="action-btn primary" onclick="doAction('walkin')">&#128100; Cliente sin reserva</button>`;
+    ap.innerHTML += `<button class="action-btn" onclick="doAction('block')">&#128274; Bloquear mesa</button>`;
+  } else if (st==='blocked') {
+    ap.innerHTML += `<button class="action-btn success" onclick="doAction('unblock')">&#128275; Desbloquear mesa</button>`;
+  } else if (st==='waiting') {
+    ap.innerHTML += `<button class="action-btn primary" onclick="doAction('assign')">&#10003; Asignar a esta mesa</button>`;
+  }
+}
+function resetSidebar() {
+  selectedTable = null;
+  document.getElementById('detail-panel').innerHTML = `<div class="sidebar-label">Mesa seleccionada</div><div class="no-selection"><div class="no-selection-icon"><i class="ti ti-layout-grid"></i></div><div class="no-selection-text">Toc\u00e1 una mesa para ver su detalle</div></div>`;
+  document.getElementById('actions-panel').innerHTML = `<div style="text-align:center;padding:16px 0;font-size:12px;color:var(--text3)">Selecci\u00f3n\u00e1 una mesa</div>`;
+}
+function doAction(action) {
+  const t = selectedTable; const status = tableStatuses[t.id]; const res = status?.reservations;
+  const confirmBtn = document.getElementById('modal-confirm');
+  confirmBtn.style.display=''; confirmBtn.style.background=''; confirmBtn.style.borderColor=''; confirmBtn.textContent='Confirmar';
+  if (action==='seat') {
+    showConfirmModal(`Sentar cliente en Mesa ${t.number}`,`\u00bfConfirm\u00e1s que ${res?.client_name||'el cliente'} lleg\u00f3?`, async()=>{ await updateTableStatus(t.id,'occupied'); if(res) await updateReservationStatus(res.id,'seated'); toast('\u2713 Cliente sentado'); });
+  } else if (action==='release') {
+    showConfirmModal(`Liberar Mesa ${t.number}`,'\u00bfConfirm\u00e1s que los clientes se fueron?', async()=>{
+      await updateTableStatus(t.id,'free',null);
+      if(res){ const {data:freshRes}=await sb.from('reservations').select('id,ghl_contact_id').eq('id',res.id).single(); await updateReservationStatus(res.id,'released'); if(freshRes?.ghl_contact_id) updateGHLPipeline(freshRes.ghl_contact_id,'released'); }
+      toast('\u2713 Mesa liberada');
+    });
+  } else if (action==='cancel') {
+    const clientName = res?.client_name||'este cliente';
+    document.getElementById('modal-title').innerHTML=`<i class="ti ti-x" style="color:var(--occupied)"></i> Cancelar reserva`;
+    document.getElementById('modal-body').innerHTML=`<div style="background:var(--occupied-bg);border:1px solid rgba(244,133,122,0.3);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px"><p style="font-size:13px;color:var(--occupied);font-weight:600;margin-bottom:4px">${clientName}</p><p style="font-size:12px;color:var(--text2)">Mesa ${t.number} \u00b7 ${res?.people_count||''} personas \u00b7 ${formatTime(res?.reserved_at)}</p></div><p style="font-size:12px;color:var(--text2)">Esta acci\u00f3n no se puede deshacer.</p>`;
+    document.getElementById('modal-confirm').style.background='var(--occupied)'; document.getElementById('modal-confirm').style.borderColor='var(--occupied)'; document.getElementById('modal-confirm').textContent='Confirmar cancelaci\u00f3n';
+    document.getElementById('modal-confirm').onclick=async()=>{ closeModal('action-modal'); await updateTableStatus(t.id,'free',null); if(res){await updateReservationStatus(res.id,'cancelled'); updateGHLPipeline(res.ghl_contact_id,'cancelled');} toast('Reserva cancelada'); };
+    document.getElementById('action-modal').classList.add('show');
+  } else if (action==='noshow') {
+    const clientName=res?.client_name||'el cliente'; const minsLate=res?.reserved_at?Math.floor((Date.now()-new Date(res.reserved_at))/60000):0;
+    document.getElementById('modal-title').innerHTML=`<i class="ti ti-clock-off" style="color:var(--occupied)"></i> Marcar No-show`;
+    document.getElementById('modal-body').innerHTML=`<div style="background:var(--occupied-bg);border:1px solid rgba(244,133,122,0.3);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px"><p style="font-size:13px;color:var(--occupied);font-weight:600;margin-bottom:4px">${clientName}</p><p style="font-size:12px;color:var(--text2)">Mesa ${t.number} \u00b7 Reserva a las ${formatTime(res?.reserved_at)} \u00b7 ${minsLate} min sin llegar</p></div><p style="font-size:12px;color:var(--text2)">La mesa se liberar\u00e1 y GHL registrar\u00e1 el no-show.</p>`;
+    document.getElementById('modal-confirm').style.background='var(--occupied)'; document.getElementById('modal-confirm').style.borderColor='var(--occupied)'; document.getElementById('modal-confirm').textContent='Confirmar no-show';
+    document.getElementById('modal-confirm').onclick=async()=>{ closeModal('action-modal'); await updateTableStatus(t.id,'free',null); if(res){await updateReservationStatus(res.id,'noshow'); updateGHLPipeline(res.ghl_contact_id,'noshow');} toast('No-show registrado'); };
+    document.getElementById('action-modal').classList.add('show');
+  } else if (action==='block') {
+    showInputModal(`Bloquear Mesa ${t.number}`,'Motivo del bloqueo (opcional)','Ej: mantenimiento, reservado...', async(reason)=>{ await updateTableStatus(t.id,'blocked',null,reason||'Sin especificar'); toast('Mesa bloqueada'); });
+  } else if (action==='unblock') {
+    showConfirmModal(`Desbloquear Mesa ${t.number}`,'\u00bfConfirm\u00e1s desbloquear esta mesa?', async()=>{ await updateTableStatus(t.id,'free',null); toast('Mesa desbloqueada'); });
+  } else if (action==='walkin') { showWalkInModal(t);
+  } else if (action==='move') { showMoveModal(t); }
+}
+function showMoveModal(t) {
+  const freeTables = tables.filter(x=>x.room_id===currentRoom.id&&x.id!==t.id&&(tableStatuses[x.id]?.status||'free')==='free').sort((a,b)=>a.number-b.number);
+  document.getElementById('modal-title').innerHTML=`<i class="ti ti-arrows-exchange"></i> Cambiar Mesa ${t.number}`;
+  document.getElementById('modal-body').innerHTML=!freeTables.length?`<p style="font-size:13px;color:var(--text2)">No hay mesas libres en este sal\u00f3n.</p>`:`<p style="font-size:12px;color:var(--text2);margin-bottom:10px">Eleg\u00ed la mesa de destino:</p><div style="display:flex;flex-wrap:wrap;gap:8px">${freeTables.map(x=>`<button class="action-btn" style="flex:1 1 30%;margin-bottom:0" onclick="moveTable('${t.id}','${x.id}',${x.number})">Mesa ${x.number}</button>`).join('')}</div>`;
+  document.getElementById('modal-confirm').style.display='none';
+  document.getElementById('action-modal').classList.add('show');
+}
+function moveTable(fromId,toId,toNumber){ closeModal('action-modal'); performMove(fromId,toId,toNumber); }
+async function performMove(fromId,toId,toNumber){
+  const resId=tableStatuses[fromId]?.reservation_id||null;
+  await sb.from('table_status').update({status:'occupied',reservation_id:resId,blocked_reason:null,updated_at:new Date().toISOString()}).eq('table_id',toId);
+  await sb.from('table_status').update({status:'free',reservation_id:null,blocked_reason:null,updated_at:new Date().toISOString()}).eq('table_id',fromId);
+  if(resId) await sb.from('reservations').update({table_id:toId}).eq('id',resId);
+  selectedTable=null; await refreshStatuses(); resetSidebar(); toast(`\u2713 Cliente movido a Mesa ${toNumber}`);
+}
+async function updateTableStatus(tableId,status,reservationId=undefined,blockedReason=null){
+  const update={status,updated_at:new Date().toISOString()};
+  if(reservationId!==undefined) update.reservation_id=reservationId;
+  update.blocked_reason=blockedReason;
+  await sb.from('table_status').update(update).eq('table_id',tableId);
+  tableStatuses[tableId]={...tableStatuses[tableId],...update};
+  renderGrid(); updateStats(); updateSidebar(); updateTurnoSummary();
+}
+async function updateReservationStatus(reservationId,status){ await sb.from('reservations').update({status,updated_at:new Date().toISOString()}).eq('id',reservationId); }
+function showWalkInModal(t) {
+  document.getElementById('modal-body').innerHTML=`<input class="modal-input" id="wi-people" type="number" placeholder="Cantidad de personas" min="1" max="${t.capacity}">`;
+  document.getElementById('modal-title').textContent=`Cliente sin reserva - Mesa ${t.number}`;
+  document.getElementById('modal-confirm').style.background=''; document.getElementById('modal-confirm').style.borderColor=''; document.getElementById('modal-confirm').textContent='Confirmar';
+  document.getElementById('modal-confirm').onclick=async()=>{
+    const people=parseInt(document.getElementById('wi-people').value);
+    if(!people){toast('Complet\u00e1 la cantidad de personas');return;}
+    const now=new Date(); const ends=new Date(now.getTime()+restaurant.slot_duration_minutes*60000);
+    const {data:res}=await sb.from('reservations').insert({restaurant_id:restaurant.id,room_id:currentRoom.id,table_id:t.id,client_name:null,client_phone:null,people_count:people,reserved_at:now.toISOString(),ends_at:ends.toISOString(),status:'seated'}).select().single();
+    await updateTableStatus(t.id,'occupied',res?.id); await refreshStatuses(); closeModal('action-modal'); toast(`\u2713 Mesa ${t.number} ocupada`);
+  };
+  document.getElementById('action-modal').classList.add('show');
+}
+async function loadWaitlist() {
+  if(!restaurant) return;
+  const {data}=await sb.from('waitlist').select('*').eq('restaurant_id',restaurant.id).eq('status','waiting').order('arrived_at');
+  renderWaitlist(data||[]);
+}
+function renderWaitlist(items){
+  const panel=document.getElementById('waitlist-panel'); if(!panel) return;
+  if(!items.length){panel.innerHTML=`<div style="text-align:center;padding:8px 0;font-size:11px;color:var(--text3)">Sin clientes en espera</div>`;return;}
+  panel.innerHTML=items.map(w=>{
+    const callBtn = w.client_phone ? `<div class="waitlist-call" onclick="llamarClienteEspera('${w.id}','${w.client_name}')">&#128242; Llamar</div>` : '';
+    return `<div class="waitlist-item" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="waitlist-name">${w.client_name}</div><div class="waitlist-info">${w.people_count} personas · ${timeSince(w.arrived_at)}</div></div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;margin-left:8px">${callBtn}<div class="waitlist-assign" onclick="assignWaitlist('${w.id}')">Asignar</div><div class="waitlist-cancel" onclick="cancelWaitlist('${w.id}')">Cancelar</div></div></div>`;
+  }).join('');
+}
+async function cancelWaitlist(waitlistId) {
+  await sb.from('waitlist').update({status:'cancelled'}).eq('id',waitlistId);
+  await loadWaitlist();
+  toast('Cliente eliminado de la lista de espera');
+}
+async function llamarClienteEspera(waitlistId, clientName) {
+  toast(`Enviando WhatsApp a ${clientName}...`);
+  try {
+    await fetch(N8N_LLAMAR_ESPERA_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ waitlistId: waitlistId }) });
+    toast(`\u2705 WhatsApp enviado a ${clientName}`);
+    await loadWaitlist();
+  } catch(e) { console.error('Error llamando cliente espera:', e); toast('Error al enviar el WhatsApp'); }
+}
+function openWaitlistModal(){
+  document.getElementById('wl-prefix').textContent = restaurant.phone_prefix || '+549';
+  document.getElementById('wl-phone').placeholder = getPhonePlaceholder();
+  document.getElementById('wl-name').value=''; document.getElementById('wl-people').value=''; document.getElementById('wl-phone').value='';
+  document.getElementById('waitlist-modal').classList.add('show');
+}
+async function addToWaitlist(){
+  const name=document.getElementById('wl-name').value.trim(); const people=parseInt(document.getElementById('wl-people').value); const phoneRaw=document.getElementById('wl-phone').value.trim();
+  const prefix=restaurant.phone_prefix||'+549'; const phone=phoneRaw?prefix+phoneRaw:null;
+  if(!name||!people){toast('Complet\u00e1 nombre y personas');return;}
+  await sb.from('waitlist').insert({restaurant_id:restaurant.id,client_name:name,people_count:people,client_phone:phone,status:'waiting'});
+  closeModal('waitlist-modal'); await loadWaitlist(); toast(`\u2713 ${name} agregado a la lista de espera`);
+}
+async function assignWaitlist(waitlistId){
+  if(!selectedTable){toast('Selecci\u00f3n\u00e1 una mesa primero');return;}
+  const t=selectedTable; const st=tableStatuses[t.id]?.status;
+  if(st!=='free'){toast('La mesa seleccionada no est\u00e1 libre');return;}
+  const {data:w}=await sb.from('waitlist').select('*').eq('id',waitlistId).single();
+  const now=new Date(); const ends=new Date(now.getTime()+restaurant.slot_duration_minutes*60000);
+  const {data:res}=await sb.from('reservations').insert({restaurant_id:restaurant.id,room_id:currentRoom.id,table_id:t.id,client_name:w.client_name,client_phone:w.client_phone,people_count:w.people_count,reserved_at:now.toISOString(),ends_at:ends.toISOString(),status:'seated'}).select().single();
+  await updateTableStatus(t.id,'occupied',res?.id); await refreshStatuses();
+  await sb.from('waitlist').update({status:'assigned',assigned_at:now.toISOString(),table_id:t.id}).eq('id',waitlistId);
+  await loadWaitlist(); toast(`\u2713 ${w.client_name} asignado a Mesa ${t.number}`);
+}
+async function loadPendingReservations(){
+  if(!restaurant||!currentRoom) return;
+  const start=new Date(currentDate); start.setHours(0,0,0,0);
+  const end=new Date(currentDate); end.setHours(23,59,59,999);
+  const {data}=await sb.from('reservations').select('*').eq('restaurant_id',restaurant.id).eq('room_id',currentRoom.id).is('table_id',null).gte('reserved_at',start.toISOString()).lte('reserved_at',end.toISOString()).order('reserved_at');
+  const pending=(data||[]).filter(r=>!['cancelled','finished','noshow'].includes(r.status));
+  renderPendingReservations(pending);
+}
+function renderPendingReservations(items){
+  const panel=document.getElementById('pending-res-panel'); const badge=document.getElementById('pending-badge'); const mobileBtn=document.getElementById('mobile-pending-btn');
+  if(badge) badge.style.display='none';
+  if(mobileBtn) mobileBtn.style.display='none';
+  if(!panel) return;
+  if(!items.length){panel.innerHTML=`<div style="text-align:center;padding:8px 0;font-size:11px;color:var(--text3)">Sin reservas pendientes</div>`;return;}
+  panel.innerHTML=items.map(r=>`<div class="waitlist-item" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="waitlist-name">${r.client_name}</div><div class="waitlist-info">${r.people_count||1} personas \u00b7 ${formatTime(r.reserved_at)}</div>${r.notes?`<div class="waitlist-info" style="color:var(--accent);margin-top:2px">&#128221; ${r.notes}</div>`:''}</div><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;margin-left:8px"><div class="waitlist-assign" onclick="openAssignTableModal('${r.id}')">Asignar</div><div class="waitlist-cancel" onclick="cancelPendingReservation('${r.id}')">Cancelar</div><div class="waitlist-noshow" onclick="noshowPendingReservation('${r.id}')">No-show</div></div></div>`).join('');
+}
+function openAssignTableModal(reservationId){
+  if(!currentRoom) return;
+  const freeTables=tables.filter(x=>x.room_id===currentRoom.id&&(tableStatuses[x.id]?.status||'free')==='free').sort((a,b)=>a.number-b.number);
+  document.getElementById('modal-title').innerHTML=`<i class="ti ti-armchair"></i> Asignar a mesa`;
+  document.getElementById('modal-body').innerHTML=!freeTables.length?`<p style="font-size:13px;color:var(--text2)">No hay mesas libres en este sal\u00f3n.</p>`:`<p style="font-size:12px;color:var(--text2);margin-bottom:10px">Eleg\u00ed la mesa de destino:</p><div style="display:flex;flex-wrap:wrap;gap:8px">${freeTables.map(x=>`<button class="action-btn" style="flex:1 1 30%;margin-bottom:0" onclick="confirmAssignReservation('${reservationId}','${x.id}',${x.number})">Mesa ${x.number}</button>`).join('')}</div>`;
+  document.getElementById('modal-confirm').style.display='none';
+  document.getElementById('action-modal').classList.add('show');
+}
+function confirmAssignReservation(reservationId,tableId,tableNumber){ closeModal('action-modal'); performAssignReservation(reservationId,tableId,tableNumber); }
+async function updateGHLPipeline(ghlContactId,stageKey){
+  if(!ghlContactId) return; const stageId=GHL_STAGES[stageKey]; if(!stageId) return;
+  try {
+    const searchRes=await fetch(`https://services.leadconnectorhq.com/opportunities/search?location_id=VdjUE41BufLTAHug7KMN&contact_id=${ghlContactId}&pipeline_id=${GHL_PIPELINE_ID}`,{headers:{'Authorization':`Bearer ${GHL_TOKEN}`,'Version':'2021-07-28'}});
+    const searchData=await searchRes.json(); const opp=searchData?.opportunities?.[0]; if(!opp) return;
+    await fetch(`https://services.leadconnectorhq.com/opportunities/${opp.id}`,{method:'PUT',headers:{'Authorization':`Bearer ${GHL_TOKEN}`,'Version':'2021-07-28','Content-Type':'application/json'},body:JSON.stringify({pipelineId:GHL_PIPELINE_ID,pipelineStageId:stageId})});
+  } catch(e){console.warn('GHL sync error:',e);}
+}
+async function performAssignReservation(reservationId,tableId,tableNumber){
+  const {data:res}=await sb.from('reservations').select('*').eq('id',reservationId).single();
+  await sb.from('reservations').update({table_id:tableId,status:'seated'}).eq('id',reservationId);
+  await updateTableStatus(tableId,'occupied',reservationId);
+  await refreshStatuses(); await loadPendingReservations();
+  toast(`\u2713 ${res?.client_name||'Cliente'} sentado en Mesa ${tableNumber}`);
+  if(res?.ghl_contact_id) updateGHLPipeline(res.ghl_contact_id,'seated');
+}
+function cancelPendingReservation(reservationId){
+  showConfirmModal('Cancelar reserva','\u00bfConfirm\u00e1s cancelar esta reserva?', async()=>{
+    const {data:res}=await sb.from('reservations').select('ghl_contact_id').eq('id',reservationId).single();
+    await sb.from('reservations').update({status:'cancelled',updated_at:new Date().toISOString()}).eq('id',reservationId);
+    await loadPendingReservations(); toast('Reserva cancelada'); updateGHLPipeline(res?.ghl_contact_id,'cancelled');
+  });
+}
+function noshowPendingReservation(reservationId){
+  showConfirmModal('Marcar No-show','\u00bfConfirm\u00e1s que el cliente no se present\u00f3?', async()=>{
+    const {data:res}=await sb.from('reservations').select('ghl_contact_id').eq('id',reservationId).single();
+    await sb.from('reservations').update({status:'noshow',updated_at:new Date().toISOString()}).eq('id',reservationId);
+    await loadPendingReservations(); toast('No-show registrado'); updateGHLPipeline(res?.ghl_contact_id,'noshow');
+  });
+}
+function openPendingModal(){
+  document.getElementById('modal-title').innerHTML=`<i class="ti ti-calendar-plus"></i> Reservas sin asignar`;
+  const panel=document.getElementById('pending-res-panel');
+  document.getElementById('modal-body').innerHTML=`<div style="margin-bottom:12px">${panel?panel.innerHTML:''}</div><p style="font-size:11px;color:var(--text2)">Toc\u00e1 "Asignar" y eleg\u00ed la mesa de destino.</p>`;
+  document.getElementById('modal-confirm').style.display='none';
+  document.getElementById('action-modal').classList.add('show');
+}
+function openSummaryModal(){
+  document.getElementById('modal-title').innerHTML=`<i class="ti ti-chart-bar"></i> Resumen del sal\u00f3n`;
+  const turno=document.getElementById('turno-summary')?.innerHTML||'';
+  const pending=document.getElementById('pending-res-panel')?.innerHTML||'';
+  const waitlist=document.getElementById('waitlist-panel')?.innerHTML||'';
+  const sl=(text)=>`<div style="font-size:10px;font-weight:600;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;margin:14px 0 8px">${text}</div>`;
+  document.getElementById('modal-body').innerHTML=`${sl(`Resumen \u2014 ${currentRoom?.name||''}`)}<div style="display:flex;flex-direction:column;gap:0">${turno}</div>${sl('Reservas sin asignar')}<div>${pending}</div><p style="font-size:11px;color:var(--text3);margin-top:6px">Toc\u00e1 "Asignar" y eleg\u00ed la mesa de destino.</p>${sl('Lista de espera')}<div>${waitlist}</div>`;
+  document.getElementById('modal-confirm').style.display='none';
+  document.getElementById('action-modal').classList.add('show');
+}
+function openNuevaReservaModal(){
+  const sel=document.getElementById('nr-salon');
+  sel.innerHTML='<option value="">Selecci\u00f3n\u00e1 el sal\u00f3n</option>';
+  rooms.forEach(r=>{ const opt=document.createElement('option'); opt.value=r.id; opt.dataset.calendarId=r.ghl_calendar_id||''; opt.textContent=r.name; sel.appendChild(opt); });
+  if(currentRoom) sel.value=currentRoom.id;
+  document.getElementById('nr-prefix').textContent = restaurant.phone_prefix || '+549';
+  document.getElementById('nr-phone').placeholder = getPhonePlaceholder();
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('nr-date').value=today;
+  document.getElementById('nr-time').innerHTML='<option value="">Selecci\u00f3n\u00e1 sal\u00f3n y fecha primero</option>';
+  document.getElementById('nr-name').value=''; document.getElementById('nr-phone').value=''; document.getElementById('nr-people').value=''; document.getElementById('nr-notes').value='';
+  document.getElementById('nueva-reserva-modal').classList.add('show');
+  if(currentRoom) onSalonOFechaChange();
+}
+function onSalonOFechaChange(){
+  const date=document.getElementById('nr-date').value; const timeSelect=document.getElementById('nr-time');
+  if(!date){ timeSelect.innerHTML='<option value="">Selecci\u00f3n\u00e1 la fecha primero</option>'; return; }
+  const tz=restaurant.timezone||'America/Argentina/Mendoza'; const offset=TZ_OFFSETS[tz]||'-03:00';
+  timeSelect.innerHTML='<option value="">Selecci\u00f3n\u00e1 un horario</option>';
+  for(let h=11; h<24; h++){ for(let m=0; m<60; m+=30){ const hh=String(h).padStart(2,'0'); const mm=String(m).padStart(2,'0'); const isoWithTz=`${date}T${hh}:${mm}:00${offset}`; const opt=document.createElement('option'); opt.value=isoWithTz; opt.textContent=`${hh}:${mm}`; timeSelect.appendChild(opt); } }
+}
+async function confirmarNuevaReserva(){
+  const salonId=document.getElementById('nr-salon').value; const name=document.getElementById('nr-name').value.trim();
+  const phoneRaw=document.getElementById('nr-phone').value.trim(); const date=document.getElementById('nr-date').value;
+  const slotIso=document.getElementById('nr-time').value; const people=parseInt(document.getElementById('nr-people').value);
+  const notes=document.getElementById('nr-notes').value.trim();
+  if(!salonId){toast('Selecci\u00f3n\u00e1 un sal\u00f3n');return;} if(!name){toast('Ingres\u00e1 el nombre del cliente');return;}
+  if(!phoneRaw){toast('Ingres\u00e1 el tel\u00e9fono');return;} if(!date){toast('Selecci\u00f3n\u00e1 la fecha');return;}
+  if(!slotIso){toast('Selecci\u00f3n\u00e1 la hora');return;} if(!people){toast('Selecci\u00f3n\u00e1 la cantidad de personas');return;}
+  const prefix = restaurant.phone_prefix || '+549'; const phone = prefix + phoneRaw;
+  const reservedAt=new Date(slotIso); const endsAt=new Date(reservedAt.getTime()+(restaurant.slot_duration_minutes||90)*60000);
+  const sel=document.getElementById('nr-salon'); const selectedOption=sel.options[sel.selectedIndex]; const calendarId=selectedOption.dataset.calendarId;
+  closeModal('nueva-reserva-modal'); toast('Creando reserva...');
+  try {
+    let ghlContactId=null;
+    try {
+      const searchContact=await fetch(`https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=VdjUE41BufLTAHug7KMN&number=${encodeURIComponent(phone)}`,{headers:{'Authorization':`Bearer ${GHL_TOKEN}`,'Version':'2021-07-28'}});
+      const contactData=await searchContact.json();
+      if(contactData?.contact?.id){ ghlContactId=contactData.contact.id; }
+      else { const createContact=await fetch('https://services.leadconnectorhq.com/contacts/',{method:'POST',headers:{'Authorization':`Bearer ${GHL_TOKEN}`,'Version':'2021-07-28','Content-Type':'application/json'},body:JSON.stringify({locationId:'VdjUE41BufLTAHug7KMN',firstName:name.split(' ')[0],lastName:name.split(' ').slice(1).join(' ')||'',phone:phone})}); const newContact=await createContact.json(); ghlContactId=newContact?.contact?.id||null; }
+    } catch(e){console.warn('GHL contact error:',e);}
+    if(ghlContactId&&calendarId){ try { await fetch('https://n8n-n8n.hovq6t.easypanel.host/webhook/crear-reserva-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({calendarId:calendarId,contactId:ghlContactId,phone:phone,firstName:name.split(' ')[0],lastName:name.split(' ').slice(1).join(' ')||'',startTime:slotIso,endTime:new Date(new Date(slotIso).getTime()+(restaurant.slot_duration_minutes||90)*60000).toISOString(),title:`${name} - ${people} personas`,notes:notes||'',people:people})}); } catch(e){console.warn('n8n webhook error:',e);} }
+    await sb.from('reservations').insert({restaurant_id:restaurant.id,room_id:salonId,client_name:name,client_phone:phone,people_count:people,reserved_at:reservedAt.toISOString(),ends_at:endsAt.toISOString(),notes:notes||null,status:'confirmed',ghl_contact_id:ghlContactId});
+    await refreshStatuses(); await loadPendingReservations(); toast(`\u2705 Reserva de ${name} creada`);
+  } catch(e){ console.error('Error creando reserva:',e); toast('Error al crear la reserva'); }
+}
+function showConfirmModal(title,body,onConfirm){
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-body').innerHTML=`<p style="font-size:13px;color:var(--text2);margin-bottom:16px">${body}</p>`;
+  document.getElementById('modal-confirm').style.background=''; document.getElementById('modal-confirm').style.borderColor='';
+  document.getElementById('modal-confirm').style.display=''; document.getElementById('modal-confirm').textContent='Confirmar';
+  document.getElementById('modal-confirm').onclick=async()=>{ closeModal('action-modal'); await onConfirm(); };
+  document.getElementById('action-modal').classList.add('show');
+}
+function showInputModal(title,label,placeholder,onConfirm){
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-body').innerHTML=`<p style="font-size:12px;color:var(--text2);margin-bottom:8px">${label}</p><input class="modal-input" id="modal-input-field" placeholder="${placeholder}">`;
+  document.getElementById('modal-confirm').style.background=''; document.getElementById('modal-confirm').style.borderColor=''; document.getElementById('modal-confirm').textContent='Confirmar';
+  document.getElementById('modal-confirm').onclick=async()=>{ const val=document.getElementById('modal-input-field').value; closeModal('action-modal'); await onConfirm(val); };
+  document.getElementById('action-modal').classList.add('show');
+}
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function openDateModal(){ document.getElementById('date-input').value=currentDate.toISOString().split('T')[0]; document.getElementById('date-modal-overlay').classList.add('show'); }
+function applyDate(){ const val=document.getElementById('date-input').value; if(!val) return; currentDate=new Date(val+'T12:00:00'); setDateDisplay(); closeModal('date-modal-overlay'); loadPendingReservations(); toast('\ud83d\udcc5 Mostrando '+formatDate(currentDate)); }
+function setDateDisplay(){ const today=new Date(); const isToday=currentDate.toDateString()===today.toDateString(); const el=document.getElementById('date-display'); if(el) el.textContent=isToday?'Hoy':formatDate(currentDate); updateCalendarDay(); }
+function startClock(){ function tick(){ document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); } tick(); setInterval(tick,10000); }
+let toastTimer;
+function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2500); }
+function formatTime(iso){ if(!iso) return '\u2014'; return new Date(iso).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); }
+function formatDate(d){ return d.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'}); }
+function timeSince(iso){ const mins=Math.floor((Date.now()-new Date(iso))/60000); if(mins<1) return 'Reci\u00e9n lleg\u00f3'; if(mins<60) return `${mins} min esperando`; return `${Math.floor(mins/60)}h ${mins%60}min esperando`; }
+document.querySelectorAll('.modal-overlay').forEach(o=>{ o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('show'); }); });
+// ── FAB MENU ─────────────────────────────────────────────────────────────
+function switchSbTab(tab, btn) {
+  document.querySelectorAll('.sb-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sb-info').style.display = tab === 'info' ? '' : 'none';
+  document.getElementById('sb-reservas').style.display = tab === 'reservas' ? '' : 'none';
+  document.getElementById('sb-espera').style.display = tab === 'espera' ? '' : 'none';
+}
+function deselectTable() {
+  selectedTable = null;
+  document.querySelectorAll('.table-card').forEach(c => c.classList.remove('selected'));
+  resetSidebar();
+}
+function toggleFabMenu() {
+  const menu = document.getElementById('fab-menu');
+  const btn = document.getElementById('fab-btn');
+  const overlay = document.getElementById('fab-overlay');
+  const isOpen = menu.classList.contains('show');
+  if (isOpen) { menu.classList.remove('show'); btn.classList.remove('open'); overlay.classList.remove('show'); }
+  else { menu.classList.add('show'); btn.classList.add('open'); overlay.classList.add('show'); }
+}
+function closeFabMenu() {
+  document.getElementById('fab-menu').classList.remove('show');
+  document.getElementById('fab-btn').classList.remove('open');
+  document.getElementById('fab-overlay').classList.remove('show');
+}
+// ─────────────────────────────────────────────────────────────────────────
+
+// ── NOTIFICACIÓN DERIVACIONES ────────────────────────────────────────────
+async function checkDerivaciones() {
+  try {
+    const res = await fetch('https://services.leadconnectorhq.com/contacts/search', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${GHL_TOKEN}`, 'Version': '2021-07-28', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: restaurant.ghl_location_id, filters: [{ field: 'tags', operator: 'contains', value: 'derivacion-a-humano' }], pageLimit: 20 })
+    });
+    const data = await res.json();
+    const count = (data.contacts || []).length;
+    const btn = document.getElementById('derivaciones-btn');
+    const badge = document.getElementById('derivaciones-badge');
+    const linkText = document.getElementById('derivaciones-link-text');
+    const bnDerivaciones = document.getElementById('bn-derivaciones');
+    const bnBadge = document.getElementById('bn-deriv-badge');
+    const dbbDerivaciones = document.getElementById('dbb-derivaciones');
+    const dbbAlertDot = document.getElementById('dbb-alert-dot');
+    if (count > 0) {
+      if (btn) { btn.classList.add('tiene-derivaciones'); badge.style.display = 'flex'; badge.textContent = count; linkText.textContent = `Derivaciones (${count})`; }
+      if (bnDerivaciones) { bnDerivaciones.classList.add('alert'); bnBadge.textContent = count; bnBadge.classList.add('show'); }
+      if (dbbDerivaciones) dbbDerivaciones.classList.add('has-alert');
+      if (dbbAlertDot) dbbAlertDot.classList.add('show');
+    } else {
+      if (btn) { btn.classList.remove('tiene-derivaciones'); badge.style.display = 'none'; linkText.textContent = 'Derivaciones'; }
+      if (bnDerivaciones) { bnDerivaciones.classList.remove('alert'); bnBadge.classList.remove('show'); }
+      if (dbbDerivaciones) dbbDerivaciones.classList.remove('has-alert');
+      if (dbbAlertDot) dbbAlertDot.classList.remove('show');
+    }
+  } catch(e) { console.warn('Error chequeando derivaciones:', e); }
+}
+function updateCalendarDay() {
+  const day = currentDate ? currentDate.getDate() : new Date().getDate();
+  const el = document.getElementById('cal-day-num');
+  if (el) el.textContent = day;
+}
+// ─────────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
