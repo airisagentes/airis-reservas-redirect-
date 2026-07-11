@@ -2,32 +2,32 @@
   "redirects": [
     {
       "source": "/pura-vida/interior",
-      "destination": "https://api.airisworld.com/widget/booking/qybRJ20ees4RDcdSOJuZ",
+      "destination": "https://api.leadconnectorhq.com/widget/booking/qybRJ20ees4RDcdSOJuZ",
       "permanent": false
     },
     {
       "source": "/pura-vida/exterior",
-      "destination": "https://api.airisworld.com/widget/booking/0N0Aab67Xx8BFEoyLTs9",
+      "destination": "https://api.leadconnectorhq.com/widget/booking/0N0Aab67Xx8BFEoyLTs9",
       "permanent": false
     },
     {
-      "source": "/flores",
-      "destination": "https://api.airisworld.com/widget/booking/9EhLZ4AEhX8pRhYndBiL",
+      "source": "/flores-en-fuego/flores",
+      "destination": "https://api.leadconnectorhq.com/widget/booking/9EhLZ4AEhX8pRhYndBiL",
       "permanent": false
     },
     {
-      "source": "/fuego",
-      "destination": "https://api.airisworld.com/widget/booking/Q1x7fNFSYK91V9kowvMR",
+      "source": "/flores-en-fuego/fuego",
+      "destination": "https://api.leadconnectorhq.com/widget/booking/Q1x7fNFSYK91V9kowvMR",
       "permanent": false
     },
     {
-      "source": "/patio",
-      "destination": "https://api.airisworld.com/widget/booking/uEP8coQ7IbtKmyhmkCVb",
+      "source": "/flores-en-fuego/patio",
+      "destination": "https://api.leadconnectorhq.com/widget/booking/uEP8coQ7IbtKmyhmkCVb",
       "permanent": false
     },
     {
-      "source": "/terraza",
-      "destination": "https://api.airisworld.com/widget/booking/mlamezaGApKAisNbORvI",
+      "source": "/flores-en-fuego/terraza",
+      "destination": "https://api.leadconnectorhq.com/widget/booking/mlamezaGApKAisNbORvI",
       "permanent": false
     }
   ]
